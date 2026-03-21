@@ -11,15 +11,10 @@ import Sidebar from "../components/Sidebar";
 import Header from "../components/Header";
 import ApplicationCard from "../components/ApplicationCard";
 import CreateApplicationModal from "../components/CreateApplicationModal";
-import { supabase } from "../lib/supabase";
-import { useAuth } from "../context/AuthContext";
+import { listApplications, createApplication, deleteApplication } from "../lib/api";
 import type { Application } from "../types/database";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-
 export default function Dashboard() {
-  const { session } = useAuth();
   const [activeSection, setActiveSection] = useState("applications");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [applications, setApplications] = useState<Application[]>([]);
@@ -29,12 +24,8 @@ export default function Dashboard() {
 
   const fetchApplications = useCallback(async () => {
     setLoadingApps(true);
-    const { data, error } = await supabase
-      .from("applications")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (!error && data) setApplications(data as Application[]);
+    const { applications } = await listApplications();
+    setApplications(applications);
     setLoadingApps(false);
   }, []);
 
@@ -43,49 +34,20 @@ export default function Dashboard() {
   }, [fetchApplications]);
 
   async function handleCreate(name: string, type: string): Promise<{ error?: string; next_allowed_at?: string }> {
-    try {
-      const token = session?.access_token;
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/cloudamqp/create`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          Apikey: SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({ name, type }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        return { error: data.message || data.error || "Erro ao criar aplicação.", next_allowed_at: data.next_allowed_at };
-      }
-
-      setShowCreateModal(false);
-      await fetchApplications();
-      return {};
-    } catch {
-      return { error: "Erro de conexão. Tente novamente." };
+    const result = await createApplication(name, type);
+    if (result.error) {
+      return { error: result.error, next_allowed_at: result.next_allowed_at };
     }
+    setShowCreateModal(false);
+    await fetchApplications();
+    return {};
   }
 
   async function handleDelete(id: string) {
     setDeletingId(id);
-    try {
-      const token = session?.access_token;
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/cloudamqp/delete/${id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Apikey: SUPABASE_ANON_KEY,
-        },
-      });
-
-      if (res.ok) {
-        setApplications((prev) => prev.filter((a) => a.id !== id));
-      }
-    } catch {
-      /* ignore */
+    const result = await deleteApplication(id);
+    if (!result.error) {
+      setApplications((prev) => prev.filter((a) => a.id !== id));
     }
     setDeletingId(null);
   }

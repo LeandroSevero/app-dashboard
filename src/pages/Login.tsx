@@ -5,7 +5,7 @@ import { Server, Eye, EyeOff, LogIn, UserPlus, Loader2 } from "lucide-react";
 type Mode = "login" | "register";
 
 export default function Login() {
-  const { signIn, signUp } = useAuth();
+  const { signIn } = useAuth();
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,24 +20,11 @@ export default function Login() {
     setSuccess(null);
     setLoading(true);
 
-    if (mode === "login") {
-      const { error } = await signIn(email, password);
-      if (error) setError(translateError(error));
-    } else {
-      const { error } = await signUp(email, password);
-      if (error) setError(translateError(error));
-      else setSuccess("Conta criada! Verifique seu e-mail para confirmar o cadastro.");
-    }
+    const { error } = await signIn(email, password);
+    if (error) setError(error);
+    else if (mode === "register") setSuccess("Conta criada com sucesso! Bem-vindo.");
 
     setLoading(false);
-  }
-
-  function translateError(msg: string) {
-    if (msg.includes("Invalid login credentials")) return "E-mail ou senha inválidos.";
-    if (msg.includes("User already registered")) return "Este e-mail já está cadastrado.";
-    if (msg.includes("Password should be at least")) return "A senha deve ter no mínimo 6 caracteres.";
-    if (msg.includes("Unable to validate email")) return "E-mail inválido.";
-    return msg;
   }
 
   return (
