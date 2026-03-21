@@ -32,44 +32,51 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--color-bg)' }}>
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-500/5 rounded-full blur-3xl" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full blur-3xl opacity-10" style={{ background: 'var(--color-primary)' }} />
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] rounded-full blur-3xl opacity-10" style={{ background: 'var(--color-accent)' }} />
       </div>
 
       <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 mb-4">
-            <Server className="w-7 h-7 text-blue-400" />
+          <div
+            className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4"
+            style={{
+              background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--color-primary) 25%, transparent)',
+            }}
+          >
+            <Server className="w-7 h-7" style={{ color: 'var(--color-primary)' }} />
           </div>
-          <h1 className="text-2xl font-bold text-slate-100 tracking-tight">
+          <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--color-fg)' }}>
             Leandro Severo
           </h1>
-          <p className="text-slate-400 text-sm mt-1">Painel de Controle</p>
+          <p className="text-sm mt-1" style={{ color: 'var(--color-fg-muted)' }}>Painel de Controle</p>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
-          <div className="flex rounded-xl bg-slate-800/50 p-1 mb-6">
+        <div
+          className="rounded-2xl p-8 shadow-2xl"
+          style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}
+        >
+          <div className="flex rounded-xl p-1 mb-6" style={{ background: 'var(--color-bg-secondary)' }}>
             <button
               type="button"
               onClick={() => { setMode("login"); setError(null); setSuccess(null); }}
-              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
-                mode === "login"
-                  ? "bg-blue-500 text-white shadow-lg shadow-blue-500/20"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
+              className="flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-200"
+              style={mode === "login"
+                ? { background: 'var(--color-primary)', color: 'var(--color-primary-fg)' }
+                : { color: 'var(--color-fg-muted)', background: 'transparent' }}
             >
               Entrar
             </button>
             <button
               type="button"
               onClick={() => { setMode("register"); setError(null); setSuccess(null); }}
-              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
-                mode === "register"
-                  ? "bg-blue-500 text-white shadow-lg shadow-blue-500/20"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
+              className="flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-200"
+              style={mode === "register"
+                ? { background: 'var(--color-primary)', color: 'var(--color-primary-fg)' }
+                : { color: 'var(--color-fg-muted)', background: 'transparent' }}
             >
               Criar conta
             </button>
@@ -77,7 +84,7 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">
+              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--color-fg)' }}>
                 E-mail
               </label>
               <input
@@ -86,12 +93,17 @@ export default function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="seu@email.com"
                 required
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                className="w-full rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-all"
+                style={{
+                  background: 'var(--color-bg-secondary)',
+                  border: '1px solid var(--color-border)',
+                  color: 'var(--color-fg)',
+                }}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">
+              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--color-fg)' }}>
                 Senha
               </label>
               <div className="relative">
@@ -102,12 +114,18 @@ export default function Login() {
                   placeholder="••••••••"
                   required
                   minLength={6}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 pr-11 text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                  className="w-full rounded-xl px-4 py-2.5 pr-11 text-sm focus:outline-none transition-all"
+                  style={{
+                    background: 'var(--color-bg-secondary)',
+                    border: '1px solid var(--color-border)',
+                    color: 'var(--color-fg)',
+                  }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
+                  style={{ color: 'var(--color-fg-muted)' }}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -115,21 +133,22 @@ export default function Login() {
             </div>
 
             {error && (
-              <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
-                <p className="text-red-400 text-sm">{error}</p>
+              <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                <p className="text-sm" style={{ color: '#ef4444' }}>{error}</p>
               </div>
             )}
 
             {success && (
-              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-3">
-                <p className="text-emerald-400 text-sm">{success}</p>
+              <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)' }}>
+                <p className="text-sm" style={{ color: 'var(--color-success)' }}>{success}</p>
               </div>
             )}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-500 hover:bg-blue-400 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 mt-2"
+              className="w-full font-semibold py-2.5 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
+              style={{ background: 'var(--color-primary)', color: 'var(--color-primary-fg)' }}
             >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -143,7 +162,7 @@ export default function Login() {
           </form>
         </div>
 
-        <p className="text-center text-slate-600 text-xs mt-6">
+        <p className="text-center text-xs mt-6" style={{ color: 'var(--color-fg-muted)' }}>
           app.leandrosevero.com.br
         </p>
       </div>

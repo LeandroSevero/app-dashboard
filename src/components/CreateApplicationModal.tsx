@@ -44,18 +44,26 @@ export default function CreateApplicationModal({ onClose, onCreate }: CreateAppl
 
   return (
     <div
-      className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.4)' }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl animate-in">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-800">
+      <div
+        className="rounded-2xl w-full max-w-md shadow-2xl animate-in"
+        style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}
+      >
+        <div
+          className="flex items-center justify-between px-6 py-5"
+          style={{ borderBottom: '1px solid var(--color-border)' }}
+        >
           <div>
-            <h2 className="text-slate-100 font-semibold text-base">Nova Aplicação</h2>
-            <p className="text-slate-500 text-xs mt-0.5">Crie uma nova instância de mensageria</p>
+            <h2 className="font-semibold text-base" style={{ color: 'var(--color-fg)' }}>Nova Aplicação</h2>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--color-fg-muted)' }}>Crie uma nova instância de mensageria</p>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-all"
+            className="p-1.5 rounded-lg transition-all"
+            style={{ color: 'var(--color-fg-muted)' }}
           >
             <X className="w-4 h-4" />
           </button>
@@ -63,7 +71,7 @@ export default function CreateApplicationModal({ onClose, onCreate }: CreateAppl
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-fg)' }}>
               Nome da aplicação
             </label>
             <input
@@ -73,12 +81,17 @@ export default function CreateApplicationModal({ onClose, onCreate }: CreateAppl
               placeholder="ex: minha-api-producao"
               required
               maxLength={50}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+              className="w-full rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-all"
+              style={{
+                background: 'var(--color-bg-secondary)',
+                border: '1px solid var(--color-border)',
+                color: 'var(--color-fg)',
+              }}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-fg)' }}>
               Tipo de instância
             </label>
             <div className="grid grid-cols-2 gap-3">
@@ -104,10 +117,10 @@ export default function CreateApplicationModal({ onClose, onCreate }: CreateAppl
           </div>
 
           {error && (
-            <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 space-y-1">
-              <p className="text-red-400 text-sm font-medium">{error}</p>
+            <div className="rounded-xl px-4 py-3 space-y-1" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+              <p className="text-sm font-medium" style={{ color: '#ef4444' }}>{error}</p>
               {nextAllowed && (
-                <div className="flex items-center gap-1.5 text-xs text-red-400/70">
+                <div className="flex items-center gap-1.5 text-xs" style={{ color: 'rgba(239,68,68,0.7)' }}>
                   <Clock className="w-3 h-3" />
                   <span>Disponível em: {formatNextAllowed(nextAllowed)}</span>
                 </div>
@@ -115,9 +128,12 @@ export default function CreateApplicationModal({ onClose, onCreate }: CreateAppl
             </div>
           )}
 
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3">
-            <p className="text-slate-500 text-xs">
-              Limite: <span className="text-slate-400">1 criação a cada 24 horas</span> por conta.
+          <div
+            className="rounded-xl px-4 py-3"
+            style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}
+          >
+            <p className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>
+              Limite: <span style={{ color: 'var(--color-fg)' }}>1 criação a cada 24 horas</span> por conta.
             </p>
           </div>
 
@@ -125,14 +141,16 @@ export default function CreateApplicationModal({ onClose, onCreate }: CreateAppl
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2.5 rounded-xl border border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600 text-sm font-medium transition-all"
+              className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all"
+              style={{ color: 'var(--color-fg-muted)', border: '1px solid var(--color-border)', background: 'transparent' }}
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading || !name.trim()}
-              className="flex-1 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-400 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20"
+              className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ background: 'var(--color-primary)', color: 'var(--color-primary-fg)' }}
             >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -159,21 +177,22 @@ interface TypeOptionProps {
 }
 
 function TypeOption({ selected, onSelect, icon, label, description, color }: TypeOptionProps) {
-  const borderColor = selected
+  const selectedStyle = selected
     ? color === "orange"
-      ? "border-orange-500/40 bg-orange-500/5"
-      : "border-cyan-500/40 bg-cyan-500/5"
-    : "border-slate-700 bg-slate-800/50 hover:border-slate-600";
+      ? { border: '1px solid rgba(249,115,22,0.35)', background: 'rgba(249,115,22,0.05)' }
+      : { border: '1px solid rgba(6,182,212,0.35)', background: 'rgba(6,182,212,0.05)' }
+    : { border: '1px solid var(--color-border)', background: 'var(--color-bg-secondary)' };
 
   return (
     <button
       type="button"
       onClick={onSelect}
-      className={`p-3.5 rounded-xl border text-left transition-all duration-150 ${borderColor}`}
+      className="p-3.5 rounded-xl text-left transition-all duration-150"
+      style={selectedStyle}
     >
       <div className="mb-2">{icon}</div>
-      <p className="text-slate-200 text-sm font-medium">{label}</p>
-      <p className="text-slate-500 text-xs mt-0.5">{description}</p>
+      <p className="text-sm font-medium" style={{ color: 'var(--color-fg)' }}>{label}</p>
+      <p className="text-xs mt-0.5" style={{ color: 'var(--color-fg-muted)' }}>{description}</p>
     </button>
   );
 }

@@ -14,10 +14,18 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
     : "LS";
 
   return (
-    <header className="fixed top-0 right-0 left-0 h-14 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 z-20 flex items-center px-4 gap-3">
+    <header
+      className="fixed top-0 right-0 left-0 h-14 backdrop-blur-md z-20 flex items-center px-4 gap-3"
+      style={{
+        background: 'var(--color-header-bg)',
+        borderBottom: '1px solid var(--color-border)',
+        boxShadow: '0 1px 8px var(--color-header-shadow)',
+      }}
+    >
       <button
         onClick={onToggleSidebar}
-        className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-all"
+        className="p-2 rounded-lg transition-all"
+        style={{ color: 'var(--color-fg-muted)' }}
         title="Alternar menu"
       >
         <Menu className="w-4 h-4" />
@@ -25,20 +33,33 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
 
       <div className="flex-1" />
 
-      <button className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-all relative">
+      <button
+        className="p-2 rounded-lg transition-all relative"
+        style={{ color: 'var(--color-fg-muted)' }}
+      >
         <Bell className="w-4 h-4" />
       </button>
 
-      <div className="flex items-center gap-2.5 pl-2 border-l border-slate-800">
-        <div className="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-          <span className="text-blue-400 text-xs font-bold">{initials}</span>
+      <div
+        className="flex items-center gap-2.5 pl-2"
+        style={{ borderLeft: '1px solid var(--color-border)' }}
+      >
+        <div
+          className="w-7 h-7 rounded-lg flex items-center justify-center"
+          style={{
+            background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--color-primary) 25%, transparent)',
+          }}
+        >
+          <span className="text-xs font-bold" style={{ color: 'var(--color-primary)' }}>{initials}</span>
         </div>
-        <span className="text-slate-300 text-sm hidden sm:block max-w-[160px] truncate">
+        <span className="text-sm hidden sm:block max-w-[160px] truncate" style={{ color: 'var(--color-fg)' }}>
           {user?.email}
         </span>
         <button
           onClick={signOut}
-          className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
+          className="p-1.5 rounded-lg transition-all"
+          style={{ color: 'var(--color-fg-muted)' }}
           title="Sair"
         >
           <LogOut className="w-4 h-4" />

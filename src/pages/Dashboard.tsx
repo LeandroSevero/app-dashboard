@@ -55,7 +55,7 @@ export default function Dashboard() {
   const sidebarWidth = sidebarCollapsed ? "ml-16" : "ml-60";
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
+    <div className="min-h-screen" style={{ background: 'var(--color-bg)', color: 'var(--color-fg)' }}>
       <Sidebar
         activeSection={activeSection}
         onSectionChange={setActiveSection}
@@ -100,26 +100,33 @@ function DashboardHome({ apps }: { apps: Application[] }) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-100">Visão Geral</h1>
-        <p className="text-slate-400 text-sm mt-1">Bem-vindo ao seu painel DevOps.</p>
+        <h1 className="text-2xl font-bold" style={{ color: 'var(--color-fg)' }}>Visão Geral</h1>
+        <p className="text-sm mt-1" style={{ color: 'var(--color-fg-muted)' }}>Bem-vindo ao seu painel DevOps.</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard icon={<Package className="w-5 h-5 text-blue-400" />} label="Total de aplicações" value={total} color="blue" />
+        <StatCard icon={<Package className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />} label="Total de aplicações" value={total} color="primary" />
         <StatCard icon={<Server className="w-5 h-5 text-orange-400" />} label="RabbitMQ" value={rabbitmq} color="orange" />
         <StatCard icon={<Activity className="w-5 h-5 text-cyan-400" />} label="LavinMQ" value={lavinmq} color="cyan" />
       </div>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-        <h2 className="text-slate-300 font-semibold text-sm mb-4 flex items-center gap-2">
-          <LayoutDashboard className="w-4 h-4 text-slate-500" />
+      <div
+        className="rounded-2xl p-6"
+        style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}
+      >
+        <h2 className="font-semibold text-sm mb-4 flex items-center gap-2" style={{ color: 'var(--color-fg)' }}>
+          <LayoutDashboard className="w-4 h-4" style={{ color: 'var(--color-fg-muted)' }} />
           Módulos disponíveis em breve
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {["Cursos", "Monitor SSL", "Vulnerabilidades", "Blacklist IP", "Observabilidade"].map((mod) => (
-            <div key={mod} className="bg-slate-800/50 border border-slate-700/50 rounded-xl px-3 py-3 text-center">
-              <p className="text-slate-500 text-xs font-medium">{mod}</p>
-              <p className="text-xs text-slate-600 mt-0.5">Em breve</p>
+            <div
+              key={mod}
+              className="rounded-xl px-3 py-3 text-center"
+              style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}
+            >
+              <p className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>{mod}</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--color-border2)' }}>Em breve</p>
             </div>
           ))}
         </div>
@@ -137,21 +144,21 @@ function StatCard({
   icon: React.ReactNode;
   label: string;
   value: number;
-  color: "blue" | "orange" | "cyan";
+  color: "primary" | "orange" | "cyan";
 }) {
-  const bg = {
-    blue: "bg-blue-500/5 border-blue-500/10",
-    orange: "bg-orange-500/5 border-orange-500/10",
-    cyan: "bg-cyan-500/5 border-cyan-500/10",
-  }[color];
+  const borderStyle = color === "primary"
+    ? { background: 'color-mix(in srgb, var(--color-primary) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 15%, transparent)' }
+    : color === "orange"
+    ? { background: 'rgba(249,115,22,0.05)', border: '1px solid rgba(249,115,22,0.1)' }
+    : { background: 'rgba(6,182,212,0.05)', border: '1px solid rgba(6,182,212,0.1)' };
 
   return (
-    <div className={`${bg} border rounded-2xl p-5`}>
+    <div className="rounded-2xl p-5" style={borderStyle}>
       <div className="flex items-center justify-between mb-3">
-        <span className="text-slate-500 text-xs font-medium">{label}</span>
+        <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>{label}</span>
         {icon}
       </div>
-      <p className="text-3xl font-bold text-slate-100">{value}</p>
+      <p className="text-3xl font-bold" style={{ color: 'var(--color-fg)' }}>{value}</p>
     </div>
   );
 }
@@ -177,20 +184,22 @@ function ApplicationsSection({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100">Aplicações</h1>
-          <p className="text-slate-400 text-sm mt-1">Gerencie suas instâncias de mensageria.</p>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--color-fg)' }}>Aplicações</h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--color-fg-muted)' }}>Gerencie suas instâncias de mensageria.</p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={onRefresh}
-            className="p-2 rounded-xl text-slate-500 hover:text-slate-300 hover:bg-slate-800 border border-slate-800 transition-all"
+            className="p-2 rounded-xl transition-all"
+            style={{ color: 'var(--color-fg-muted)', border: '1px solid var(--color-border)', background: 'transparent' }}
             title="Atualizar"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
           <button
             onClick={onOpenCreate}
-            className="flex items-center gap-2 bg-blue-500 hover:bg-blue-400 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all shadow-lg shadow-blue-500/20"
+            className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl transition-all"
+            style={{ background: 'var(--color-primary)', color: 'var(--color-primary-fg)' }}
           >
             <Plus className="w-4 h-4" />
             Criar aplicação
@@ -201,8 +210,8 @@ function ApplicationsSection({
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <div className="flex flex-col items-center gap-3">
-            <RefreshCw className="w-6 h-6 text-slate-600 animate-spin" />
-            <p className="text-slate-500 text-sm">Carregando aplicações...</p>
+            <RefreshCw className="w-6 h-6 animate-spin" style={{ color: 'var(--color-fg-muted)' }} />
+            <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>Carregando aplicações...</p>
           </div>
         </div>
       ) : applications.length === 0 ? (
@@ -226,16 +235,20 @@ function ApplicationsSection({
 function EmptyState({ onOpenCreate }: { onOpenCreate: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center mb-5">
-        <Server className="w-7 h-7 text-slate-600" />
+      <div
+        className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5"
+        style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}
+      >
+        <Server className="w-7 h-7" style={{ color: 'var(--color-fg-muted)' }} />
       </div>
-      <h3 className="text-slate-300 font-semibold text-base mb-1">Nenhuma aplicação ainda</h3>
-      <p className="text-slate-500 text-sm max-w-xs mb-6">
+      <h3 className="font-semibold text-base mb-1" style={{ color: 'var(--color-fg)' }}>Nenhuma aplicação ainda</h3>
+      <p className="text-sm max-w-xs mb-6" style={{ color: 'var(--color-fg-muted)' }}>
         Crie sua primeira instância de mensageria RabbitMQ ou LavinMQ.
       </p>
       <button
         onClick={onOpenCreate}
-        className="flex items-center gap-2 bg-blue-500 hover:bg-blue-400 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-blue-500/20"
+        className="flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl transition-all"
+        style={{ background: 'var(--color-primary)', color: 'var(--color-primary-fg)' }}
       >
         <Plus className="w-4 h-4" />
         Criar primeira aplicação
