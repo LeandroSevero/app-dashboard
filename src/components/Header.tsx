@@ -1,5 +1,6 @@
-import { Menu, LogOut, Bell } from "lucide-react";
+import { Menu, LogOut, Bell, Sun, Moon } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 
 interface HeaderProps {
   onToggleSidebar: () => void;
@@ -8,6 +9,7 @@ interface HeaderProps {
 
 export default function Header({ onToggleSidebar }: HeaderProps) {
   const { user, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   const initials = user?.email
     ? user.email.substring(0, 2).toUpperCase()
@@ -38,6 +40,15 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
         style={{ color: 'var(--color-fg-muted)' }}
       >
         <Bell className="w-4 h-4" />
+      </button>
+
+      <button
+        onClick={toggleTheme}
+        className="p-1.5 rounded-lg transition-all flex items-center justify-center"
+        style={{ background: 'var(--color-toggle-bg)', color: 'var(--color-fg-muted)' }}
+        title={theme === "dark" ? "Mudar para modo claro" : "Mudar para modo escuro"}
+      >
+        {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
       </button>
 
       <div

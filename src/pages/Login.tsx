@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { Server, Eye, EyeOff, LogIn, UserPlus, Loader2 } from "lucide-react";
+import { useTheme } from "../context/ThemeContext";
+import { Server, Eye, EyeOff, LogIn, UserPlus, Loader2, Sun, Moon } from "lucide-react";
 
 type Mode = "login" | "register";
 
 export default function Login() {
   const { signIn, signUp } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -33,6 +35,15 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--color-bg)' }}>
+      <button
+        onClick={toggleTheme}
+        className="fixed top-4 right-4 p-2 rounded-xl transition-all z-10"
+        style={{ background: 'var(--color-toggle-bg)', color: 'var(--color-fg-muted)' }}
+        title={theme === "dark" ? "Mudar para modo claro" : "Mudar para modo escuro"}
+      >
+        {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+      </button>
+
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full blur-3xl opacity-10" style={{ background: 'var(--color-primary)' }} />
         <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] rounded-full blur-3xl opacity-10" style={{ background: 'var(--color-accent)' }} />
