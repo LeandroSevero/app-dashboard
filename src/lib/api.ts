@@ -47,9 +47,10 @@ export async function createApplication(
 
 export async function deleteApplication(id: string): Promise<{ success?: boolean; error?: string }> {
   try {
-    const res = await fetch(`/api/applications/${id}`, {
-      method: "DELETE",
+    const res = await fetch("/api/applications/delete", {
+      method: "POST",
       headers: authHeaders(),
+      body: JSON.stringify({ id }),
     });
     const data = await res.json();
     if (!res.ok) return { error: data.error };
