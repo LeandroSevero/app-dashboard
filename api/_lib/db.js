@@ -1,12 +1,12 @@
 import { MongoClient } from "mongodb";
 
-const uri = process.env.MONGODB_URI;
+const uri = process.env.app_MONGODB_URI;
 
 let client;
 let clientPromise;
 
 if (!uri) {
-  throw new Error("MONGODB_URI não definida");
+  throw new Error("app_MONGODB_URI não definida");
 }
 
 if (process.env.NODE_ENV === "development") {

@@ -135,7 +135,7 @@ api/
 
 | Variável | Onde | Descrição |
 |---|---|---|
-| `MONGODB_URI` | Vercel (backend) | String de conexão MongoDB |
+| `app_MONGODB_URI` | Vercel (backend) | String de conexão MongoDB |
 | `CLOUDAMQP_API_KEY` | Vercel (backend) | Chave da API CloudAMQP |
 | `JWT_SECRET` | Vercel (backend) | Segredo para assinar tokens JWT |
 
