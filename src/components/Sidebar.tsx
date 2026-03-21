@@ -72,7 +72,7 @@ export default function Sidebar({ activeSection, onSectionChange, collapsed }: S
                 <>
                   <span className="flex-1 text-left">{item.label}</span>
                   {!item.available && (
-                    <span className="text-xs bg-slate-700/60 text-slate-500 px-1.5 py-0.5 rounded-md">Em breve</span>
+                    <span className="text-xs bg-slate-700/60 text-slate-500 px-1.5 py-0.5 rounded-md whitespace-nowrap">Em breve</span>
                   )}
                   {isActive && <ChevronRight className="w-3.5 h-3.5 text-blue-400" />}
                 </>
