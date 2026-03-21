@@ -9,3 +9,11 @@ export interface Application {
   panel_url: string;
   created_at: string;
 }
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  role: "admin" | "user";
+  created_at: string;
+  applications: Application[];
+}

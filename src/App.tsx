@@ -2,6 +2,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import AdminDashboard from "./pages/AdminDashboard";
 
 function AppRouter() {
   const { user, loading } = useAuth();
@@ -17,7 +18,9 @@ function AppRouter() {
     );
   }
 
-  return user ? <Dashboard /> : <Login />;
+  if (!user) return <Login />;
+  if (user.role === "admin") return <AdminDashboard />;
+  return <Dashboard />;
 }
 
 export default function App() {

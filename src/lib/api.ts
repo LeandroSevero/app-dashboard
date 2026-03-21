@@ -1,4 +1,4 @@
-import type { Application } from "../types/database";
+import type { Application, AdminUser } from "../types/database";
 
 function getToken(): string | null {
   return localStorage.getItem("ls_dashboard_token");
@@ -51,6 +51,83 @@ export async function deleteApplication(id: string): Promise<{ success?: boolean
       method: "POST",
       headers: authHeaders(),
       body: JSON.stringify({ id }),
+    });
+    const data = await res.json();
+    if (!res.ok) return { error: data.error };
+    return { success: true };
+  } catch {
+    return { error: "Erro de conexão" };
+  }
+}
+
+export async function adminListUsers(): Promise<{ users: AdminUser[]; error?: string }> {
+  try {
+    const res = await fetch("/api/admin/users", { headers: authHeaders() });
+    const data = await res.json();
+    if (!res.ok) return { users: [], error: data.error };
+    return { users: data.users };
+  } catch {
+    return { users: [], error: "Erro de conexão" };
+  }
+}
+
+export async function adminUpdateUser(
+  userId: string,
+  updates: { newPassword?: string; newEmail?: string }
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const res = await fetch("/api/admin/update-user", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ userId, ...updates }),
+    });
+    const data = await res.json();
+    if (!res.ok) return { error: data.error };
+    return { success: true };
+  } catch {
+    return { error: "Erro de conexão" };
+  }
+}
+
+export async function adminDeleteUser(userId: string): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const res = await fetch("/api/admin/delete-user", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ userId }),
+    });
+    const data = await res.json();
+    if (!res.ok) return { error: data.error };
+    return { success: true };
+  } catch {
+    return { error: "Erro de conexão" };
+  }
+}
+
+export async function adminUpdateApplication(
+  appId: string,
+  newName: string
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const res = await fetch("/api/admin/update-application", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ appId, newName }),
+    });
+    const data = await res.json();
+    if (!res.ok) return { error: data.error };
+    return { success: true };
+  } catch {
+    return { error: "Erro de conexão" };
+  }
+}
+
+export async function adminDeleteApplication(appId: string): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const res = await fetch("/api/admin/delete-application", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ appId }),
     });
     const data = await res.json();
     if (!res.ok) return { error: data.error };
