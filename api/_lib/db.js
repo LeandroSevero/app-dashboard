@@ -22,5 +22,5 @@ if (process.env.NODE_ENV === "development") {
 
 export async function getDb() {
   const c = await clientPromise;
-  return c.db("dashboard");
+  return c.db("app-dashboard");
 }
