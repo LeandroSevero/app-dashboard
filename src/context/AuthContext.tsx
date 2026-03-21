@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { supabase } from "../lib/supabase";
 
 interface AuthUser {
   id: string;
@@ -43,30 +42,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function signIn(email: string, password: string): Promise<{ error: string | null }> {
-    if (import.meta.env.DEV) {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) return { error: error.message };
-      const authUser: AuthUser = {
-        id: data.user?.id ?? "",
-        email: data.user?.email ?? "",
-        role: (data.user?.user_metadata?.role as "admin" | "user") ?? "user",
-      };
-      const accessToken = data.session?.access_token ?? "";
-      localStorage.setItem(TOKEN_KEY, accessToken);
-      localStorage.setItem(USER_KEY, JSON.stringify(authUser));
-      setToken(accessToken);
-      setUser(authUser);
-      return { error: null };
-    }
-
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
+
       const data = await res.json();
-      if (!res.ok) return { error: data.error || "Erro ao fazer login" };
+
+      if (!res.ok) {
+        return { error: data.error || "Erro ao fazer login" };
+      }
+
       localStorage.setItem(TOKEN_KEY, data.token);
       localStorage.setItem(USER_KEY, JSON.stringify(data.user));
       setToken(data.token);
@@ -78,30 +66,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signUp(email: string, password: string): Promise<{ error: string | null }> {
-    if (import.meta.env.DEV) {
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) return { error: error.message };
-      const authUser: AuthUser = {
-        id: data.user?.id ?? "",
-        email: data.user?.email ?? "",
-        role: (data.user?.user_metadata?.role as "admin" | "user") ?? "user",
-      };
-      const accessToken = data.session?.access_token ?? "";
-      localStorage.setItem(TOKEN_KEY, accessToken);
-      localStorage.setItem(USER_KEY, JSON.stringify(authUser));
-      setToken(accessToken);
-      setUser(authUser);
-      return { error: null };
-    }
-
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
+
       const data = await res.json();
-      if (!res.ok) return { error: data.error || "Erro ao criar conta" };
+
+      if (!res.ok) {
+        return { error: data.error || "Erro ao criar conta" };
+      }
+
       localStorage.setItem(TOKEN_KEY, data.token);
       localStorage.setItem(USER_KEY, JSON.stringify(data.user));
       setToken(data.token);
