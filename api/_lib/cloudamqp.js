@@ -46,3 +46,11 @@ export async function deleteInstance(cloudamqpId) {
   if (!CLOUDAMQP_API_KEY) return null;
   return request(`/instances/${cloudamqpId}`, "DELETE");
 }
+
+export async function rotateInstancePassword(cloudamqpId) {
+  if (!CLOUDAMQP_API_KEY) {
+    const mockPass = "mock_rotated_" + Math.random().toString(36).substring(2, 12);
+    return { password: mockPass };
+  }
+  return request(`/instances/${cloudamqpId}/rotate-password`, "POST");
+}

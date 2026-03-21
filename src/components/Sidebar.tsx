@@ -8,6 +8,7 @@ import {
   BarChart3,
   ChevronRight,
   Users,
+  User,
 } from "lucide-react";
 
 interface NavItem {
@@ -23,6 +24,7 @@ interface SidebarProps {
   onSectionChange: (section: string) => void;
   collapsed: boolean;
   isAdmin?: boolean;
+  profileCompletion?: number;
 }
 
 const navItems: NavItem[] = [
@@ -37,9 +39,12 @@ const navItems: NavItem[] = [
 
 const adminItems: NavItem[] = [
   { icon: <Users className="w-4 h-4" />, label: "Usuários", section: "admin-users", available: true, adminOnly: true },
+  { icon: <Server className="w-4 h-4" />, label: "Aplicações", section: "admin-apps", available: true, adminOnly: true },
 ];
 
-export default function Sidebar({ activeSection, onSectionChange, collapsed, isAdmin }: SidebarProps) {
+export default function Sidebar({ activeSection, onSectionChange, collapsed, isAdmin, profileCompletion }: SidebarProps) {
+  const showProfileWarning = !isAdmin && profileCompletion !== undefined && profileCompletion < 100;
+
   return (
     <aside
       className={`fixed left-0 top-0 h-full z-30 flex flex-col transition-all duration-300 ${collapsed ? "w-16" : "w-60"}`}
@@ -79,6 +84,26 @@ export default function Sidebar({ activeSection, onSectionChange, collapsed, isA
           />
         ))}
 
+        {!isAdmin && (
+          <>
+            {!collapsed && (
+              <div className="pt-3 pb-1 px-3">
+                <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-border2)' }}>
+                  Conta
+                </p>
+              </div>
+            )}
+            {collapsed && <div className="h-px mx-2 my-2" style={{ background: 'var(--color-border)' }} />}
+            <NavButton
+              item={{ icon: <User className="w-4 h-4" />, label: "Meu Perfil", section: "profile", available: true }}
+              isActive={activeSection === "profile"}
+              collapsed={collapsed}
+              onSelect={onSectionChange}
+              badge={showProfileWarning ? `${profileCompletion}%` : undefined}
+            />
+          </>
+        )}
+
         {isAdmin && (
           <>
             {!collapsed && (
@@ -116,9 +141,10 @@ interface NavButtonProps {
   isActive: boolean;
   collapsed: boolean;
   onSelect: (section: string) => void;
+  badge?: string;
 }
 
-function NavButton({ item, isActive, collapsed, onSelect }: NavButtonProps) {
+function NavButton({ item, isActive, collapsed, onSelect, badge }: NavButtonProps) {
   return (
     <button
       onClick={() => item.available && onSelect(item.section)}
@@ -136,7 +162,15 @@ function NavButton({ item, isActive, collapsed, onSelect }: NavButtonProps) {
           : { color: 'var(--color-border2)', border: '1px solid transparent', cursor: 'not-allowed' }
       }
     >
-      <span className="flex-shrink-0">{item.icon}</span>
+      <span className="flex-shrink-0 relative">
+        {item.icon}
+        {badge && collapsed && (
+          <span
+            className="absolute -top-1 -right-1 w-2 h-2 rounded-full"
+            style={{ background: '#f97316' }}
+          />
+        )}
+      </span>
       {!collapsed && (
         <>
           <span className="flex-1 text-left">{item.label}</span>
@@ -148,7 +182,15 @@ function NavButton({ item, isActive, collapsed, onSelect }: NavButtonProps) {
               Em breve
             </span>
           )}
-          {isActive && <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--color-primary)' }} />}
+          {badge && (
+            <span
+              className="text-xs px-1.5 py-0.5 rounded-md font-semibold whitespace-nowrap"
+              style={{ background: 'rgba(249,115,22,0.12)', color: '#f97316', border: '1px solid rgba(249,115,22,0.2)' }}
+            >
+              {badge}
+            </span>
+          )}
+          {isActive && !badge && <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--color-primary)' }} />}
         </>
       )}
     </button>

@@ -8,6 +8,8 @@ import {
   CheckCheck,
   Server,
   Zap,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import type { Application } from "../types/database";
 
@@ -19,8 +21,10 @@ interface ApplicationCardProps {
 
 export default function ApplicationCard({ app, onDelete, deleting }: ApplicationCardProps) {
   const [showPassword, setShowPassword] = useState(false);
+  const [showMqttPassword, setShowMqttPassword] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showMqtt, setShowMqtt] = useState(false);
 
   async function copyToClipboard(text: string, field: string) {
     try {
@@ -43,85 +47,94 @@ export default function ApplicationCard({ app, onDelete, deleting }: Application
     year: "numeric",
   });
 
+  const mqttUsername = app.mqtt_username || `${app.username}:${app.username}`;
+  const mqttPassword = app.mqtt_password || app.password;
+  const mqttHostname = app.mqtt_hostname || "";
+
   return (
     <div
-      className="rounded-2xl p-5 transition-all duration-200 group"
+      className="rounded-2xl transition-all duration-200"
       style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}
     >
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}
-          >
-            {app.type === "lavinmq" ? (
-              <Zap className="w-4.5 h-4.5 text-cyan-400" />
-            ) : (
-              <Server className="w-4.5 h-4.5 text-orange-400" />
-            )}
-          </div>
-          <div>
-            <h3 className="font-semibold text-sm leading-tight" style={{ color: 'var(--color-fg)' }}>{app.name}</h3>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--color-fg-muted)' }}>{createdDate}</p>
-          </div>
-        </div>
-        <span className="text-xs font-medium px-2.5 py-1 rounded-lg" style={typeBadgeStyle}>
-          {typeLabel}
-        </span>
-      </div>
-
-      <div className="space-y-2.5 mb-4">
-        <CredentialRow
-          label="AMQP URL"
-          value={app.amqp_url}
-          masked={false}
-          field="url"
-          copiedField={copiedField}
-          onCopy={copyToClipboard}
-        />
-        <CredentialRow
-          label="Usuário"
-          value={app.username}
-          masked={false}
-          field="username"
-          copiedField={copiedField}
-          onCopy={copyToClipboard}
-        />
-        <div
-          className="rounded-xl px-3 py-2 flex items-center gap-2"
-          style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}
-        >
-          <span className="text-xs w-16 flex-shrink-0" style={{ color: 'var(--color-fg-muted)' }}>Senha</span>
-          <span className="text-xs font-mono flex-1 truncate" style={{ color: 'var(--color-fg)' }}>
-            {showPassword ? app.password : "•".repeat(Math.min(app.password.length, 20))}
-          </span>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <button
-              onClick={() => setShowPassword(!showPassword)}
-              className="p-1 rounded-lg transition-colors"
-              style={{ color: 'var(--color-fg-muted)' }}
-              title={showPassword ? "Ocultar senha" : "Mostrar senha"}
+      <div className="p-5">
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}
             >
-              {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-            </button>
-            <button
-              onClick={() => copyToClipboard(app.password, "password")}
-              className="p-1 rounded-lg transition-colors"
-              style={{ color: 'var(--color-fg-muted)' }}
-              title="Copiar senha"
-            >
-              {copiedField === "password" ? (
-                <CheckCheck className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />
+              {app.type === "lavinmq" ? (
+                <Zap className="w-4 h-4 text-cyan-400" />
               ) : (
-                <Copy className="w-3.5 h-3.5" />
+                <Server className="w-4 h-4 text-orange-400" />
               )}
-            </button>
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm leading-tight" style={{ color: 'var(--color-fg)' }}>{app.name}</h3>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--color-fg-muted)' }}>{createdDate}</p>
+            </div>
+          </div>
+          <span className="text-xs font-medium px-2.5 py-1 rounded-lg" style={typeBadgeStyle}>
+            {typeLabel}
+          </span>
+        </div>
+
+        <div className="mb-3">
+          <p className="text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--color-fg-muted)' }}>AMQP Details</p>
+          <div className="space-y-2">
+            <CredentialRow label="URL" value={app.amqp_url} field="url" copiedField={copiedField} onCopy={copyToClipboard} />
+            <CredentialRow label="Usuário" value={app.username} field="username" copiedField={copiedField} onCopy={copyToClipboard} />
+            <PasswordRow
+              label="Senha"
+              value={app.password}
+              field="password"
+              show={showPassword}
+              onToggleShow={() => setShowPassword(!showPassword)}
+              copiedField={copiedField}
+              onCopy={copyToClipboard}
+            />
           </div>
         </div>
+
+        <button
+          onClick={() => setShowMqtt(!showMqtt)}
+          className="w-full flex items-center justify-between py-2 px-3 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all"
+          style={{
+            background: showMqtt ? 'var(--color-bg-secondary)' : 'transparent',
+            color: 'var(--color-fg-muted)',
+            border: '1px solid var(--color-border)',
+          }}
+        >
+          <span>MQTT Details</span>
+          {showMqtt ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+        </button>
+
+        {showMqtt && (
+          <div className="mt-2 space-y-2">
+            <CredentialRow label="Hostname" value={mqttHostname} field="mqtt_host" copiedField={copiedField} onCopy={copyToClipboard} />
+            <CredentialRow
+              label="Ports"
+              value={`${app.mqtt_port ?? 1883} (${app.mqtt_port_tls ?? 8883} for TLS)`}
+              field="mqtt_ports"
+              copiedField={copiedField}
+              onCopy={copyToClipboard}
+            />
+            <CredentialRow label="Username" value={mqttUsername} field="mqtt_user" copiedField={copiedField} onCopy={copyToClipboard} />
+            <PasswordRow
+              label="Password"
+              value={mqttPassword}
+              field="mqtt_pass"
+              show={showMqttPassword}
+              onToggleShow={() => setShowMqttPassword(!showMqttPassword)}
+              copiedField={copiedField}
+              onCopy={copyToClipboard}
+            />
+          </div>
+        )}
       </div>
 
       <div
-        className="flex items-center gap-2 pt-3"
+        className="flex items-center gap-2 px-5 py-3"
         style={{ borderTop: '1px solid var(--color-border)' }}
       >
         {app.panel_url && (
@@ -178,7 +191,6 @@ export default function ApplicationCard({ app, onDelete, deleting }: Application
 interface CredentialRowProps {
   label: string;
   value: string;
-  masked: boolean;
   field: string;
   copiedField: string | null;
   onCopy: (text: string, field: string) => void;
@@ -190,7 +202,7 @@ function CredentialRow({ label, value, field, copiedField, onCopy }: CredentialR
       className="rounded-xl px-3 py-2 flex items-center gap-2"
       style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}
     >
-      <span className="text-xs w-16 flex-shrink-0" style={{ color: 'var(--color-fg-muted)' }}>{label}</span>
+      <span className="text-xs w-20 flex-shrink-0 font-medium" style={{ color: 'var(--color-fg-muted)' }}>{label}</span>
       <span className="text-xs font-mono flex-1 truncate" style={{ color: 'var(--color-fg)' }}>{value}</span>
       <button
         onClick={() => onCopy(value, field)}
@@ -204,6 +216,42 @@ function CredentialRow({ label, value, field, copiedField, onCopy }: CredentialR
           <Copy className="w-3.5 h-3.5" />
         )}
       </button>
+    </div>
+  );
+}
+
+interface PasswordRowProps {
+  label: string;
+  value: string;
+  field: string;
+  show: boolean;
+  onToggleShow: () => void;
+  copiedField: string | null;
+  onCopy: (text: string, field: string) => void;
+}
+
+function PasswordRow({ label, value, field, show, onToggleShow, copiedField, onCopy }: PasswordRowProps) {
+  return (
+    <div
+      className="rounded-xl px-3 py-2 flex items-center gap-2"
+      style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}
+    >
+      <span className="text-xs w-20 flex-shrink-0 font-medium" style={{ color: 'var(--color-fg-muted)' }}>{label}</span>
+      <span className="text-xs font-mono flex-1 truncate" style={{ color: 'var(--color-fg)' }}>
+        {show ? value : "•".repeat(Math.min(value.length, 24))}
+      </span>
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <button onClick={onToggleShow} className="p-1 rounded-lg transition-colors" style={{ color: 'var(--color-fg-muted)' }}>
+          {show ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+        </button>
+        <button onClick={() => onCopy(value, field)} className="p-1 rounded-lg transition-colors" style={{ color: 'var(--color-fg-muted)' }}>
+          {copiedField === field ? (
+            <CheckCheck className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />
+          ) : (
+            <Copy className="w-3.5 h-3.5" />
+          )}
+        </button>
+      </div>
     </div>
   );
 }

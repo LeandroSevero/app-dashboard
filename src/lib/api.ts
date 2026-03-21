@@ -1,4 +1,4 @@
-import type { Application, AdminUser } from "../types/database";
+import type { Application, AdminUser, UserProfile } from "../types/database";
 
 function getToken(): string | null {
   return localStorage.getItem("ls_dashboard_token");
@@ -132,6 +132,51 @@ export async function adminDeleteApplication(appId: string): Promise<{ success?:
     const data = await res.json();
     if (!res.ok) return { error: data.error };
     return { success: true };
+  } catch {
+    return { error: "Erro de conexão" };
+  }
+}
+
+export async function adminRotatePassword(
+  appId: string
+): Promise<{ success?: boolean; new_password?: string; new_url?: string; error?: string }> {
+  try {
+    const res = await fetch("/api/admin/rotate-password", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ appId }),
+    });
+    const data = await res.json();
+    if (!res.ok) return { error: data.error };
+    return { success: true, new_password: data.new_password, new_url: data.new_url };
+  } catch {
+    return { error: "Erro de conexão" };
+  }
+}
+
+export async function getProfile(): Promise<{ profile?: UserProfile; error?: string }> {
+  try {
+    const res = await fetch("/api/profile/get", { headers: authHeaders() });
+    const data = await res.json();
+    if (!res.ok) return { error: data.error };
+    return { profile: data.profile };
+  } catch {
+    return { error: "Erro de conexão" };
+  }
+}
+
+export async function updateProfile(
+  updates: Partial<UserProfile> & { newPassword?: string; newEmail?: string }
+): Promise<{ success?: boolean; profile?: UserProfile; token?: string; user?: { id: string; email: string; role: string }; error?: string }> {
+  try {
+    const res = await fetch("/api/profile/update", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(updates),
+    });
+    const data = await res.json();
+    if (!res.ok) return { error: data.error };
+    return { success: true, profile: data.profile, token: data.token, user: data.user };
   } catch {
     return { error: "Erro de conexão" };
   }

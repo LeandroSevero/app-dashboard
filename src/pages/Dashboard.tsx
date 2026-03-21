@@ -6,13 +6,16 @@ import {
   RefreshCw,
   Package,
   Activity,
+  User,
 } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Header from "../components/Header";
 import ApplicationCard from "../components/ApplicationCard";
 import CreateApplicationModal from "../components/CreateApplicationModal";
+import UserProfile, { calcCompletion } from "../components/UserProfile";
+import ProfileIncompletePopup from "../components/ProfileIncompletePopup";
 import { listApplications, createApplication, deleteApplication } from "../lib/api";
-import type { Application } from "../types/database";
+import type { Application, UserProfile as UserProfileType } from "../types/database";
 
 export default function Dashboard() {
   const [activeSection, setActiveSection] = useState("applications");
@@ -21,6 +24,10 @@ export default function Dashboard() {
   const [loadingApps, setLoadingApps] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  const [profileCompletion, setProfileCompletion] = useState(100);
+  const [showProfilePopup, setShowProfilePopup] = useState(false);
+  const [popupDismissed, setPopupDismissed] = useState(false);
 
   const fetchApplications = useCallback(async () => {
     setLoadingApps(true);
@@ -32,6 +39,25 @@ export default function Dashboard() {
   useEffect(() => {
     fetchApplications();
   }, [fetchApplications]);
+
+  function handleProfileLoaded(profile: UserProfileType) {
+    const pct = calcCompletion(profile);
+    setProfileCompletion(pct);
+    if (pct < 100 && !popupDismissed) {
+      setShowProfilePopup(true);
+    }
+  }
+
+  function handleDismissPopup() {
+    setShowProfilePopup(false);
+    setPopupDismissed(true);
+  }
+
+  function handleGoToProfile() {
+    setShowProfilePopup(false);
+    setPopupDismissed(true);
+    setActiveSection("profile");
+  }
 
   async function handleCreate(name: string, type: string): Promise<{ error?: string; next_allowed_at?: string }> {
     const result = await createApplication(name, type);
@@ -60,6 +86,7 @@ export default function Dashboard() {
         activeSection={activeSection}
         onSectionChange={setActiveSection}
         collapsed={sidebarCollapsed}
+        profileCompletion={profileCompletion}
       />
       <Header
         onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -79,6 +106,11 @@ export default function Dashboard() {
               onOpenCreate={() => setShowCreateModal(true)}
             />
           )}
+          {activeSection === "profile" && (
+            <UserProfile
+              onProfileLoaded={handleProfileLoaded}
+            />
+          )}
         </div>
       </main>
 
@@ -86,6 +118,14 @@ export default function Dashboard() {
         <CreateApplicationModal
           onClose={() => setShowCreateModal(false)}
           onCreate={handleCreate}
+        />
+      )}
+
+      {showProfilePopup && profileCompletion < 100 && (
+        <ProfileIncompletePopup
+          completion={profileCompletion}
+          onClose={handleDismissPopup}
+          onGoToProfile={handleGoToProfile}
         />
       )}
     </div>
@@ -256,3 +296,5 @@ function EmptyState({ onOpenCreate }: { onOpenCreate: () => void }) {
     </div>
   );
 }
+
+export { User };

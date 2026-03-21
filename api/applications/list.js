@@ -25,17 +25,27 @@ export default async function handler(req, res) {
       .sort({ createdAt: -1 })
       .toArray();
 
-    const formatted = apps.map((app) => ({
-      id: app._id.toString(),
-      name: app.name,
-      type: app.type,
-      amqp_url: app.connection?.url || "",
-      username: app.connection?.username || "",
-      password: app.connection?.password || "",
-      cloudamqp_id: app.cloudamqpId || "",
-      panel_url: app.connection?.managementUrl || "",
-      created_at: app.createdAt?.toISOString() || new Date().toISOString(),
-    }));
+    const formatted = apps.map((app) => {
+      const hostname = app.connection?.url
+        ? (() => { try { return new URL(app.connection.url.replace("amqps://", "https://")).hostname; } catch { return ""; } })()
+        : "";
+      return {
+        id: app._id.toString(),
+        name: app.name,
+        type: app.type,
+        amqp_url: app.connection?.url || "",
+        username: app.connection?.username || "",
+        password: app.connection?.password || "",
+        cloudamqp_id: app.cloudamqpId || "",
+        panel_url: app.connection?.managementUrl || "",
+        created_at: app.createdAt?.toISOString() || new Date().toISOString(),
+        mqtt_hostname: app.connection?.mqttHostname || hostname,
+        mqtt_username: app.connection?.mqttUsername || `${app.connection?.username}:${app.connection?.username}`,
+        mqtt_password: app.connection?.mqttPassword || app.connection?.password || "",
+        mqtt_port: 1883,
+        mqtt_port_tls: 8883,
+      };
+    });
 
     return res.status(200).json({ applications: formatted });
   } catch (err) {
