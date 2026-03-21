@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { supabase } from "../lib/supabase";
 
 interface AuthUser {
   id: string;
@@ -20,44 +21,6 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 const TOKEN_KEY = "ls_dashboard_token";
 const USER_KEY = "ls_dashboard_user";
-
-async function signInDev(email: string, password: string): Promise<{ error: string | null; token?: string; user?: AuthUser }> {
-  const { createClient } = await import("@supabase/supabase-js");
-  const supabase = createClient(
-    import.meta.env.VITE_SUPABASE_URL as string,
-    import.meta.env.VITE_SUPABASE_ANON_KEY as string
-  );
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) return { error: error.message };
-  return {
-    error: null,
-    token: data.session?.access_token,
-    user: {
-      id: data.user?.id ?? "",
-      email: data.user?.email ?? "",
-      role: (data.user?.user_metadata?.role as "admin" | "user") ?? "user",
-    },
-  };
-}
-
-async function signUpDev(email: string, password: string): Promise<{ error: string | null; token?: string; user?: AuthUser }> {
-  const { createClient } = await import("@supabase/supabase-js");
-  const supabase = createClient(
-    import.meta.env.VITE_SUPABASE_URL as string,
-    import.meta.env.VITE_SUPABASE_ANON_KEY as string
-  );
-  const { data, error } = await supabase.auth.signUp({ email, password });
-  if (error) return { error: error.message };
-  return {
-    error: null,
-    token: data.session?.access_token,
-    user: {
-      id: data.user?.id ?? "",
-      email: data.user?.email ?? "",
-      role: (data.user?.user_metadata?.role as "admin" | "user") ?? "user",
-    },
-  };
-}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -81,14 +44,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signIn(email: string, password: string): Promise<{ error: string | null }> {
     if (import.meta.env.DEV) {
-      const result = await signInDev(email, password);
-      if (result.error) return { error: result.error };
-      if (result.token && result.user) {
-        localStorage.setItem(TOKEN_KEY, result.token);
-        localStorage.setItem(USER_KEY, JSON.stringify(result.user));
-        setToken(result.token);
-        setUser(result.user);
-      }
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) return { error: error.message };
+      const authUser: AuthUser = {
+        id: data.user?.id ?? "",
+        email: data.user?.email ?? "",
+        role: (data.user?.user_metadata?.role as "admin" | "user") ?? "user",
+      };
+      const accessToken = data.session?.access_token ?? "";
+      localStorage.setItem(TOKEN_KEY, accessToken);
+      localStorage.setItem(USER_KEY, JSON.stringify(authUser));
+      setToken(accessToken);
+      setUser(authUser);
       return { error: null };
     }
 
@@ -112,14 +79,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signUp(email: string, password: string): Promise<{ error: string | null }> {
     if (import.meta.env.DEV) {
-      const result = await signUpDev(email, password);
-      if (result.error) return { error: result.error };
-      if (result.token && result.user) {
-        localStorage.setItem(TOKEN_KEY, result.token);
-        localStorage.setItem(USER_KEY, JSON.stringify(result.user));
-        setToken(result.token);
-        setUser(result.user);
-      }
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) return { error: error.message };
+      const authUser: AuthUser = {
+        id: data.user?.id ?? "",
+        email: data.user?.email ?? "",
+        role: (data.user?.user_metadata?.role as "admin" | "user") ?? "user",
+      };
+      const accessToken = data.session?.access_token ?? "";
+      localStorage.setItem(TOKEN_KEY, accessToken);
+      localStorage.setItem(USER_KEY, JSON.stringify(authUser));
+      setToken(accessToken);
+      setUser(authUser);
       return { error: null };
     }
 
