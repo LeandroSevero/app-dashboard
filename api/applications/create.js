@@ -41,6 +41,8 @@ export default async function handler(req, res) {
 
     const instance = await createInstance(name, type);
 
+    const managementUrl = instance.management_url || `https://customer.cloudamqp.com/instance/${instance.id}`;
+
     const now = new Date();
     const result = await db.collection("applications").insertOne({
       userId: user.userId,
@@ -51,7 +53,7 @@ export default async function handler(req, res) {
         url: instance.url,
         username: instance.login,
         password: instance.password,
-        managementUrl: `https://customer.cloudamqp.com/instance/${instance.id}`,
+        managementUrl,
       },
       createdAt: now,
       deletedAt: null,
@@ -71,7 +73,7 @@ export default async function handler(req, res) {
       username: instance.login,
       password: instance.password,
       cloudamqp_id: String(instance.id),
-      panel_url: `https://customer.cloudamqp.com/instance/${instance.id}`,
+      panel_url: managementUrl,
       created_at: now.toISOString(),
     };
 

@@ -5,7 +5,7 @@ import { Server, Eye, EyeOff, LogIn, UserPlus, Loader2 } from "lucide-react";
 type Mode = "login" | "register";
 
 export default function Login() {
-  const { signIn } = useAuth();
+  const { signIn, signUp } = useAuth();
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,9 +20,13 @@ export default function Login() {
     setSuccess(null);
     setLoading(true);
 
-    const { error } = await signIn(email, password);
-    if (error) setError(error);
-    else if (mode === "register") setSuccess("Conta criada com sucesso! Bem-vindo.");
+    if (mode === "login") {
+      const { error } = await signIn(email, password);
+      if (error) setError(error);
+    } else {
+      const { error } = await signUp(email, password);
+      if (error) setError(error);
+    }
 
     setLoading(false);
   }

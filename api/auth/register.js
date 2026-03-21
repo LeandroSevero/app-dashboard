@@ -23,33 +23,39 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "E-mail e senha são obrigatórios" });
   }
 
+  if (password.length < 6) {
+    return res.status(400).json({ error: "A senha deve ter pelo menos 6 caracteres" });
+  }
+
   try {
     const db = await getDb();
     const users = db.collection("users");
 
-    const user = await users.findOne({ email: email.toLowerCase() });
-
-    if (!user) {
-      return res.status(404).json({ error: "Usuário não encontrado. Crie uma conta." });
+    const existing = await users.findOne({ email: email.toLowerCase() });
+    if (existing) {
+      return res.status(409).json({ error: "E-mail já cadastrado. Faça login." });
     }
 
     const hashed = hashPassword(password);
-    if (user.password !== hashed) {
-      return res.status(401).json({ error: "E-mail ou senha inválidos" });
-    }
-
-    const token = signToken({
-      userId: user._id.toString(),
-      email: user.email,
-      role: user.role || "user",
+    const result = await users.insertOne({
+      email: email.toLowerCase(),
+      password: hashed,
+      role: "user",
+      createdAt: new Date(),
     });
 
-    return res.status(200).json({
+    const token = signToken({
+      userId: result.insertedId.toString(),
+      email: email.toLowerCase(),
+      role: "user",
+    });
+
+    return res.status(201).json({
       token,
       user: {
-        id: user._id.toString(),
-        email: user.email,
-        role: user.role || "user",
+        id: result.insertedId.toString(),
+        email: email.toLowerCase(),
+        role: "user",
       },
     });
   } catch (err) {

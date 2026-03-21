@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 interface AuthUser {
   id: string;
   email: string;
+  role: "admin" | "user";
 }
 
 interface AuthContextType {
@@ -11,6 +12,7 @@ interface AuthContextType {
   token: string | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => void;
 }
 
@@ -63,6 +65,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function signUp(email: string, password: string): Promise<{ error: string | null }> {
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        return { error: data.error || "Erro ao criar conta" };
+      }
+
+      localStorage.setItem(TOKEN_KEY, data.token);
+      localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+      setToken(data.token);
+      setUser(data.user);
+      return { error: null };
+    } catch {
+      return { error: "Erro de conexão. Verifique sua internet." };
+    }
+  }
+
   function signOut() {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
@@ -71,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, token, loading, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

@@ -30,6 +30,7 @@ export async function createInstance(name, type) {
       login: `mock_${mockId}`,
       password: `mock_pass_${mockId}`,
       apikey: mockId,
+      management_url: `https://customer.cloudamqp.com/instance/${mockId}`,
     };
   }
 
