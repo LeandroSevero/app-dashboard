@@ -849,9 +849,9 @@ function AdminAppRow({ app, onUpdated, onDeleted }: AdminAppRowProps) {
             <Eye className="w-3.5 h-3.5" />
           </button>
 
-          {app.panel_url && (
+          {(app.mqtt_hostname || app.panel_url) && (
             <a
-              href={app.panel_url}
+              href={app.mqtt_hostname ? `https://${app.mqtt_hostname}/#/` : app.panel_url!}
               target="_blank"
               rel="noopener noreferrer"
               className="p-1.5 rounded-lg transition-all"
@@ -927,22 +927,26 @@ function AdminAppRow({ app, onUpdated, onDeleted }: AdminAppRowProps) {
 
       {showDetails && (
         <div
-          className="mx-6 mb-4 rounded-xl p-4 space-y-3"
+          className="mx-6 mb-4 rounded-xl p-4 space-y-4"
           style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}
         >
-          <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-fg-muted)' }}>Credenciais</p>
-          <CredRow label="Usuário" value={app.username} />
-          <CredRow label="Senha" value={app.password} secret />
-          <CredRow label="AMQP URL" value={app.amqp_url} secret />
-          {app.mqtt_hostname && (
-            <>
-              <p className="text-xs font-semibold uppercase tracking-wider pt-1" style={{ color: 'var(--color-fg-muted)' }}>MQTT</p>
-              <CredRow label="Hostname" value={app.mqtt_hostname} />
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--color-fg-muted)' }}>Conexão do Painel Web</p>
+            <div className="space-y-2">
+              <CredRow label="Hostname" value={app.mqtt_hostname || ""} />
               <CredRow label="Porta" value={`${app.mqtt_port || 1883} / ${app.mqtt_port_tls || 8883} (TLS)`} />
-              <CredRow label="Usuário MQTT" value={app.mqtt_username || ""} />
-              <CredRow label="Senha MQTT" value={app.mqtt_password || app.password} secret />
-            </>
-          )}
+              <CredRow label="Usuário" value={app.mqtt_username || app.username} />
+              <CredRow label="Senha" value={app.mqtt_password || app.password} secret />
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--color-fg-muted)' }}>Conexão da Aplicação</p>
+            <div className="space-y-2">
+              <CredRow label="URL" value={app.amqp_url} secret />
+              <CredRow label="Usuário" value={app.username} />
+              <CredRow label="Senha" value={app.password} secret />
+            </div>
+          </div>
         </div>
       )}
     </div>
