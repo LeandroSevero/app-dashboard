@@ -54,8 +54,11 @@ Deno.serve(async (req: Request) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
+    console.log("[create-application] Authorization header present:", !!authHeader);
+    console.log("[create-application] Authorization header prefix:", authHeader?.substring(0, 20));
+
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Não autorizado" }), {
+      return new Response(JSON.stringify({ error: "Não autorizado", debug: "missing_auth_header" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -73,8 +76,10 @@ Deno.serve(async (req: Request) => {
     );
 
     const { data: { user }, error: authError } = await userClient.auth.getUser();
+    console.log("[create-application] getUser result:", { userId: user?.id, error: authError?.message });
+
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Não autorizado" }), {
+      return new Response(JSON.stringify({ error: "Não autorizado", debug: authError?.message || "no_user" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
