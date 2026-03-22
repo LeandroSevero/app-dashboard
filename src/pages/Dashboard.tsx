@@ -165,8 +165,8 @@ function DashboardHome({ apps }: { apps: Application[] }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard icon={<Package className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />} label="Total de aplicações" value={total} color="primary" />
-        <StatCard icon={<Server className="w-5 h-5 text-orange-400" />} label="RabbitMQ" value={rabbitmq} color="orange" />
-        <StatCard icon={<Activity className="w-5 h-5 text-cyan-400" />} label="LavinMQ" value={lavinmq} color="cyan" />
+        <StatCard icon={<img src="/RabbitMQ.svg" alt="RabbitMQ" className="w-5 h-5" />} label="RabbitMQ" value={rabbitmq} color="orange" />
+        <StatCard icon={<img src="/LavinMQ.svg" alt="LavinMQ" className="w-5 h-5" />} label="LavinMQ" value={lavinmq} color="cyan" />
       </div>
 
       <div

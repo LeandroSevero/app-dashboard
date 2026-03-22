@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Server, Zap, Loader2, Plus, Clock } from "lucide-react";
+import { X, Loader2, Plus, Clock } from "lucide-react";
 
 interface CreateApplicationModalProps {
   onClose: () => void;
@@ -111,7 +111,7 @@ export default function CreateApplicationModal({ onClose, onCreate }: CreateAppl
                 value="rabbitmq"
                 selected={type === "rabbitmq"}
                 onSelect={() => setType("rabbitmq")}
-                icon={<Server className="w-5 h-5 text-orange-400" />}
+                icon={<img src="/RabbitMQ.svg" alt="RabbitMQ" className="w-5 h-5" />}
                 label="RabbitMQ"
                 description="Mensageria clássica"
                 color="orange"
@@ -121,7 +121,7 @@ export default function CreateApplicationModal({ onClose, onCreate }: CreateAppl
                 value="lavinmq"
                 selected={type === "lavinmq"}
                 onSelect={() => setType("lavinmq")}
-                icon={<Zap className="w-5 h-5 text-cyan-400" />}
+                icon={<img src="/LavinMQ.svg" alt="LavinMQ" className="w-5 h-5" />}
                 label="LavinMQ"
                 description="Alta performance"
                 color="cyan"

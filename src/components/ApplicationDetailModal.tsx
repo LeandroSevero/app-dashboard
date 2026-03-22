@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   X,
-  Zap,
   RefreshCw,
   Users,
   MessageSquare,
@@ -176,7 +175,7 @@ export default function ApplicationDetailModal({ app, onClose }: ApplicationDeta
               style={{ background: "var(--color-bg-secondary)", border: "1px solid var(--color-border)" }}
             >
               {isLavinMQ
-                ? <Zap className="w-4 h-4 text-cyan-400" />
+                ? <img src="/LavinMQ.svg" alt="LavinMQ" className="w-5 h-5" />
                 : <img src="/RabbitMQ.svg" alt="RabbitMQ" className="w-5 h-5" />}
             </div>
             <div>

@@ -793,7 +793,10 @@ function AdminAppRow({ app, onUpdated, onDeleted }: AdminAppRowProps) {
           className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
           style={{ background: 'var(--color-bg-secondary)' }}
         >
-          <Server className="w-4 h-4 text-orange-400" />
+          {app.type === "lavinmq"
+            ? <img src="/LavinMQ.svg" alt="LavinMQ" className="w-5 h-5" />
+            : <img src="/RabbitMQ.svg" alt="RabbitMQ" className="w-5 h-5" />
+          }
         </div>
 
         <div className="flex-1 min-w-0">

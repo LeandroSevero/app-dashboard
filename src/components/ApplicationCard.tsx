@@ -6,7 +6,6 @@ import {
   ExternalLink,
   Trash2,
   CheckCheck,
-  Zap,
   ChevronDown,
   ChevronUp,
   BarChart3,
@@ -66,7 +65,7 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
               style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}
             >
               {app.type === "lavinmq" ? (
-                <Zap className="w-4 h-4 text-cyan-400" />
+                <img src="/LavinMQ.svg" alt="LavinMQ" className="w-5 h-5" />
               ) : (
                 <img src="/RabbitMQ.svg" alt="RabbitMQ" className="w-5 h-5" />
               )}
