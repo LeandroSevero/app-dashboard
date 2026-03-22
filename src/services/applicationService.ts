@@ -49,14 +49,16 @@ export async function createApplication(
   type: string
 ): Promise<ApiResponse<Application> & { next_allowed_at?: string }> {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await supabase.auth.refreshSession();
     const token = session?.access_token;
+
+    if (!token) return { success: false, error: "Sessão expirada. Faça login novamente." };
 
     const res = await fetch(`${SUPABASE_URL}/functions/v1/create-application`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: token ? `Bearer ${token}` : `Bearer ${SUPABASE_ANON_KEY}`,
+        Authorization: `Bearer ${token}`,
         Apikey: SUPABASE_ANON_KEY,
       },
       body: JSON.stringify({ name: name.trim(), type }),
