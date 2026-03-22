@@ -9,6 +9,7 @@ export interface AdminStats {
   total_admins: number;
   total_apps: number;
   by_type: { rabbitmq: number; lavinmq: number; mongodb: number };
+  capacity_by_type: { rabbitmq: number; lavinmq: number; mongodb: number };
   apps_last_7_days: Array<{ date: string; count: number }>;
   users_last_7_days: Array<{ date: string; count: number }>;
   recent_errors: Array<Record<string, unknown>>;

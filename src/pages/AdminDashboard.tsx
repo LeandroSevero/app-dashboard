@@ -201,7 +201,7 @@ export default function AdminDashboard() {
           )}
 
           {activeSection === "admin-resources" && (
-            <ResourcesTab apps={allApps} loading={usersLoading} onRefresh={fetchUsers} />
+            <ResourcesTab apps={allApps} loading={usersLoading} onRefresh={fetchUsers} stats={stats} />
           )}
 
           {activeSection === "admin-logs" && (
@@ -822,12 +822,15 @@ interface ResourcesTabProps {
   apps: AppWithOwner[];
   loading: boolean;
   onRefresh: () => void;
+  stats: AdminStats | null;
 }
 
-function ResourcesTab({ apps, loading, onRefresh }: ResourcesTabProps) {
+function ResourcesTab({ apps, loading, onRefresh, stats }: ResourcesTabProps) {
   const mongoApps = apps.filter((a) => a.type === "mongodb");
   const rabbitApps = apps.filter((a) => a.type === "rabbitmq");
   const lavinApps = apps.filter((a) => a.type === "lavinmq");
+
+  const capacity = stats?.capacity_by_type ?? { rabbitmq: 0, lavinmq: 0, mongodb: 0 };
 
   return (
     <div className="space-y-6">
@@ -848,6 +851,8 @@ function ResourcesTab({ apps, loading, onRefresh }: ResourcesTabProps) {
           color="#22c55e"
           border="rgba(34,197,94,0.2)"
           bg="rgba(34,197,94,0.05)"
+          used={mongoApps.length}
+          capacity={capacity.mongodb}
           stats={[
             { label: "Databases criadas", value: mongoApps.length },
             { label: "Usuários criados", value: mongoApps.length },
@@ -863,6 +868,8 @@ function ResourcesTab({ apps, loading, onRefresh }: ResourcesTabProps) {
           color="#f97316"
           border="rgba(249,115,22,0.2)"
           bg="rgba(249,115,22,0.05)"
+          used={rabbitApps.length}
+          capacity={capacity.rabbitmq}
           stats={[
             { label: "Instâncias criadas", value: rabbitApps.length },
           ]}
@@ -878,6 +885,8 @@ function ResourcesTab({ apps, loading, onRefresh }: ResourcesTabProps) {
         color="#06b6d4"
         border="rgba(6,182,212,0.2)"
         bg="rgba(6,182,212,0.05)"
+        used={lavinApps.length}
+        capacity={capacity.lavinmq}
         stats={[
           { label: "Instâncias criadas", value: lavinApps.length },
         ]}
@@ -889,24 +898,29 @@ function ResourcesTab({ apps, loading, onRefresh }: ResourcesTabProps) {
   );
 }
 
-function ResourceCard({ title, icon, color, border, bg, stats, items, loading, emptyText }: {
+function ResourceCard({ title, icon, color, border, bg, used, capacity, stats, items, loading, emptyText }: {
   title: string;
   icon: React.ReactNode;
   color: string;
   border: string;
   bg: string;
+  used: number;
+  capacity: number;
   stats: Array<{ label: string; value: number }>;
   items: Array<{ name: string; sub: string; detail: string }>;
   loading: boolean;
   emptyText: string;
 }) {
+  const pct = capacity > 0 ? Math.min(100, Math.round((used / capacity) * 100)) : 0;
+  const barColor = pct >= 90 ? "#ef4444" : pct >= 70 ? "#f59e0b" : color;
+
   return (
     <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}>
       <div className="px-5 py-4 flex items-center gap-3" style={{ background: bg, borderBottom: `1px solid ${border}` }}>
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'var(--color-card)', border: `1px solid ${border}` }}>
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'var(--color-card)', border: `1px solid ${border}` }}>
           {icon}
         </div>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm" style={{ color: 'var(--color-fg)' }}>{title}</p>
           <div className="flex items-center gap-4 mt-0.5">
             {stats.map((s) => (
@@ -916,8 +930,28 @@ function ResourceCard({ title, icon, color, border, bg, stats, items, loading, e
             ))}
           </div>
         </div>
+        {capacity > 0 && (
+          <div className="flex-shrink-0 text-right" style={{ minWidth: 56 }}>
+            <p className="text-xs font-semibold tabular-nums" style={{ color: barColor }}>{used}<span style={{ color: 'var(--color-fg-muted)', fontWeight: 400 }}>/{capacity}</span></p>
+            <p className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>{pct}% usado</p>
+          </div>
+        )}
       </div>
-      <div className="divide-y" style={{ borderColor: 'var(--color-border)' }}>
+      {capacity > 0 && (
+        <div className="px-5 pt-3 pb-1">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>Uso de capacidade</span>
+            <span className="text-xs font-medium tabular-nums" style={{ color: barColor }}>{used} de {capacity} slots</span>
+          </div>
+          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-bg-secondary)' }}>
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{ width: `${pct}%`, background: barColor }}
+            />
+          </div>
+        </div>
+      )}
+      <div className="divide-y mt-2" style={{ borderColor: 'var(--color-border)' }}>
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--color-fg-muted)' }} />

@@ -46,13 +46,19 @@ Deno.serve(async (req: Request) => {
     const [profilesRes, appsRes, limitsRes, eventsRes] = await Promise.all([
       supabase.from("profiles").select("id, role, created_at"),
       supabase.from("applications").select("id, type, created_at, user_id").is("deleted_at", null),
-      supabase.from("user_limits").select("user_id, app_type, last_created_at"),
+      supabase.from("user_limits").select("user_id, app_type, last_created_at, max_apps"),
       supabase.from("app_events").select("event_type, created_at").order("created_at", { ascending: false }).limit(200),
     ]);
 
     const profiles = profilesRes.data || [];
     const apps = appsRes.data || [];
+    const limits = limitsRes.data || [];
     const events = eventsRes.data || [];
+
+    const capacityByType = limits.reduce((acc: Record<string, number>, l: { app_type: string; max_apps: number }) => {
+      acc[l.app_type] = (acc[l.app_type] || 0) + (l.max_apps || 0);
+      return acc;
+    }, {});
 
     const totalUsers = profiles.length;
     const totalAdmins = profiles.filter((p: { role: string }) => p.role === "admin").length;
@@ -103,6 +109,11 @@ Deno.serve(async (req: Request) => {
           rabbitmq: byType["rabbitmq"] || 0,
           lavinmq: byType["lavinmq"] || 0,
           mongodb: byType["mongodb"] || 0,
+        },
+        capacity_by_type: {
+          rabbitmq: capacityByType["rabbitmq"] || 0,
+          lavinmq: capacityByType["lavinmq"] || 0,
+          mongodb: capacityByType["mongodb"] || 0,
         },
         apps_last_7_days: appsLast7Days,
         users_last_7_days: usersLast7Days,
