@@ -53,8 +53,40 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { data: authUsers, error: authUsersError } = await supabase.auth.admin.listUsers();
-    if (authUsersError) throw authUsersError;
+    const { data: authUsersData, error: authUsersError } = await supabase
+      .rpc("get_all_auth_users");
+
+    if (authUsersError) {
+      const { data: profiles } = await supabase.from("profiles").select("*");
+      const { data: apps } = await supabase
+        .from("applications")
+        .select("*")
+        .is("deleted_at", null);
+
+      const appsByUser = new Map<string, unknown[]>();
+      for (const app of apps || []) {
+        const list = appsByUser.get(app.user_id) || [];
+        list.push(mapApp(app));
+        appsByUser.set(app.user_id, list);
+      }
+
+      const users = (profiles || []).map((p) => ({
+        id: p.id,
+        email: "",
+        role: p.role || "user",
+        created_at: p.created_at,
+        full_name: p.name || "",
+        phone: p.phone || "",
+        bio: p.bio || "",
+        avatar_url: p.avatar_url || "",
+        applications: appsByUser.get(p.id) || [],
+      }));
+
+      return new Response(JSON.stringify({ users }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const { data: profiles } = await supabase.from("profiles").select("*");
     const { data: apps } = await supabase
@@ -66,30 +98,15 @@ Deno.serve(async (req: Request) => {
     const appsByUser = new Map<string, unknown[]>();
     for (const app of apps || []) {
       const list = appsByUser.get(app.user_id) || [];
-      list.push({
-        id: app.id,
-        name: app.name,
-        type: app.type,
-        amqp_url: app.amqp_url,
-        username: app.amqp_user,
-        password: app.amqp_password,
-        cloudamqp_id: app.cloudamqp_id,
-        panel_url: app.panel_url,
-        created_at: app.created_at,
-        mqtt_hostname: app.mqtt_host,
-        mqtt_username: app.mqtt_user,
-        mqtt_password: app.mqtt_password,
-        mqtt_port: app.mqtt_port,
-        mqtt_port_tls: app.mqtt_tls_port,
-      });
+      list.push(mapApp(app));
       appsByUser.set(app.user_id, list);
     }
 
-    const users = authUsers.users.map((u) => {
+    const users = (authUsersData || []).map((u: { id: string; email: string; created_at: string }) => {
       const profile = profilesMap.get(u.id);
       return {
         id: u.id,
-        email: u.email,
+        email: u.email || "",
         role: profile?.role || "user",
         created_at: u.created_at,
         full_name: profile?.name || "",
@@ -112,3 +129,22 @@ Deno.serve(async (req: Request) => {
     });
   }
 });
+
+function mapApp(app: Record<string, unknown>) {
+  return {
+    id: app.id,
+    name: app.name,
+    type: app.type,
+    amqp_url: app.amqp_url,
+    username: app.amqp_user,
+    password: app.amqp_password,
+    cloudamqp_id: app.cloudamqp_id,
+    panel_url: app.panel_url,
+    created_at: app.created_at,
+    mqtt_hostname: app.mqtt_host,
+    mqtt_username: app.mqtt_user,
+    mqtt_password: app.mqtt_password,
+    mqtt_port: app.mqtt_port,
+    mqtt_port_tls: app.mqtt_tls_port,
+  };
+}
