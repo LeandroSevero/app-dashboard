@@ -21,7 +21,6 @@ import {
   Mail,
   FileText,
   Camera,
-  Database,
   Boxes,
   ScrollText,
   AlertCircle,
@@ -308,7 +307,7 @@ function AdminDashboardSection() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <TypeCard icon={<img src="/RabbitMQ.svg" className="w-5 h-5" />} label="RabbitMQ" count={stats.by_type.rabbitmq} color="#f97316" bg="rgba(249,115,22,0.08)" border="rgba(249,115,22,0.2)" />
         <TypeCard icon={<img src="/LavinMQ.svg" className="w-5 h-5" />} label="LavinMQ" count={stats.by_type.lavinmq} color="#06b6d4" bg="rgba(6,182,212,0.08)" border="rgba(6,182,212,0.2)" />
-        <TypeCard icon={<Database className="w-5 h-5" style={{ color: '#22c55e' }} />} label="MongoDB" count={stats.by_type.mongodb} color="#22c55e" bg="rgba(34,197,94,0.08)" border="rgba(34,197,94,0.2)" />
+        <TypeCard icon={<img src="/mongodb.svg" alt="MongoDB" className="w-5 h-5" />} label="MongoDB" count={stats.by_type.mongodb} color="#22c55e" bg="rgba(34,197,94,0.08)" border="rgba(34,197,94,0.2)" />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -845,7 +844,7 @@ function ResourcesTab({ apps, loading, onRefresh }: ResourcesTabProps) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <ResourceCard
           title="MongoDB Atlas"
-          icon={<Database className="w-5 h-5" style={{ color: '#22c55e' }} />}
+          icon={<img src="/mongodb.svg" alt="MongoDB" className="w-5 h-5" />}
           color="#22c55e"
           border="rgba(34,197,94,0.2)"
           bg="rgba(34,197,94,0.05)"
@@ -1133,7 +1132,7 @@ function AdminAppRow({ app, onUpdated, onDeleted }: AdminAppRowProps) {
           {app.type === "lavinmq"
             ? <img src="/LavinMQ.svg" alt="LavinMQ" className="w-5 h-5" />
             : app.type === "mongodb"
-            ? <Server className="w-5 h-5" style={{ color: '#22c55e' }} />
+            ? <img src="/mongodb.svg" alt="MongoDB" className="w-5 h-5" />
             : <img src="/RabbitMQ.svg" alt="RabbitMQ" className="w-5 h-5" />
           }
         </div>

@@ -13,7 +13,6 @@ import {
   BarChart3,
   AlertCircle,
   Wifi,
-  Database,
 } from "lucide-react";
 import type { Application } from "../types/database";
 import { invokeWithAuth } from "../lib/supabase";
@@ -176,7 +175,7 @@ export default function ApplicationDetailModal({ app, onClose }: ApplicationDeta
               style={{ background: "var(--color-bg-secondary)", border: "1px solid var(--color-border)" }}
             >
               {isMongoDB
-                ? <Database className="w-5 h-5" style={{ color: '#22c55e' }} />
+                ? <img src="/mongodb.svg" alt="MongoDB" className="w-5 h-5" />
                 : isLavinMQ
                 ? <img src="/LavinMQ.svg" alt="LavinMQ" className="w-5 h-5" />
                 : <img src="/RabbitMQ.svg" alt="RabbitMQ" className="w-5 h-5" />}

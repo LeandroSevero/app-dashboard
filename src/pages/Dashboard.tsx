@@ -8,7 +8,6 @@ import {
   Activity,
   User,
   AlertCircle,
-  Database,
 } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Header from "../components/Header";
@@ -169,7 +168,7 @@ function DashboardHome({ apps }: { apps: Application[] }) {
         <StatCard icon={<Package className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />} label="Total de aplicações" value={total} color="primary" />
         <StatCard icon={<img src="/RabbitMQ.svg" alt="RabbitMQ" className="w-5 h-5" />} label="RabbitMQ" value={rabbitmq} color="orange" />
         <StatCard icon={<img src="/LavinMQ.svg" alt="LavinMQ" className="w-5 h-5" />} label="LavinMQ" value={lavinmq} color="cyan" />
-        <StatCard icon={<Database className="w-5 h-5" style={{ color: '#22c55e' }} />} label="MongoDB" value={mongodb} color="green" />
+        <StatCard icon={<img src="/mongodb.svg" alt="MongoDB" className="w-5 h-5" />} label="MongoDB" value={mongodb} color="green" />
       </div>
 
       <div

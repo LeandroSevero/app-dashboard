@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Loader2, Plus, Clock, Database } from "lucide-react";
+import { X, Loader2, Plus, Clock } from "lucide-react";
 
 interface CreateApplicationModalProps {
   onClose: () => void;
@@ -138,7 +138,7 @@ export default function CreateApplicationModal({ onClose, onCreate }: CreateAppl
                 value="mongodb"
                 selected={type === "mongodb"}
                 onSelect={() => setType("mongodb")}
-                icon={<Database className="w-5 h-5" style={{ color: '#22c55e' }} />}
+                icon={<img src="/mongodb.svg" alt="MongoDB" className="w-5 h-5" />}
                 label="MongoDB"
                 description="Banco de dados"
                 color="green"
