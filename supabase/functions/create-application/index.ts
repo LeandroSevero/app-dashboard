@@ -15,6 +15,13 @@ const PLAN_MAP: Record<string, string> = {
   lavinmq: "lemming",
 };
 
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 function parseAmqpUrl(url: string): { username: string; password: string; hostname: string; vhost: string } {
   try {
     const parsed = new URL(url);
@@ -33,13 +40,9 @@ async function cloudamqpGet(path: string) {
   const credentials = btoa(`:${CLOUDAMQP_API_KEY}`);
   const res = await fetch(`${CLOUDAMQP_BASE_URL}${path}`, {
     method: "GET",
-    headers: {
-      Authorization: `Basic ${credentials}`,
-      "Content-Type": "application/json",
-    },
+    headers: { Authorization: `Basic ${credentials}`, "Content-Type": "application/json" },
   });
   const text = await res.text();
-  console.log(`[cloudamqp] GET ${path} -> status=${res.status} body=${text}`);
   if (!res.ok) throw new Error(`CloudAMQP GET ${path} ${res.status}: ${text}`);
   return JSON.parse(text);
 }
@@ -47,17 +50,12 @@ async function cloudamqpGet(path: string) {
 async function cloudamqpPost(path: string, body: unknown) {
   const credentials = btoa(`:${CLOUDAMQP_API_KEY}`);
   const bodyJson = JSON.stringify(body);
-  console.log(`[cloudamqp] POST ${path} payload=${bodyJson}`);
   const res = await fetch(`${CLOUDAMQP_BASE_URL}${path}`, {
     method: "POST",
-    headers: {
-      Authorization: `Basic ${credentials}`,
-      "Content-Type": "application/json",
-    },
+    headers: { Authorization: `Basic ${credentials}`, "Content-Type": "application/json" },
     body: bodyJson,
   });
   const text = await res.text();
-  console.log(`[cloudamqp] POST ${path} -> status=${res.status} body=${text}`);
   if (!res.ok) throw new Error(`CloudAMQP POST ${path} ${res.status}: ${text}`);
   if (!text) return null;
   return JSON.parse(text);
@@ -74,12 +72,10 @@ interface InstanceDetails {
   mqttPort: number;
   mqttTlsPort: number;
   cloudamqpId: string;
-  apikey: string;
 }
 
-async function createAndFetchInstance(name: string, type: string): Promise<InstanceDetails> {
-  const normalizedType = type.toLowerCase();
-  const plan = PLAN_MAP[normalizedType];
+async function provisionInstance(name: string, type: string): Promise<InstanceDetails> {
+  const plan = PLAN_MAP[type];
   if (!plan) throw new Error(`Tipo inválido: "${type}". Use rabbitmq ou lavinmq`);
 
   if (!CLOUDAMQP_API_KEY) {
@@ -97,7 +93,6 @@ async function createAndFetchInstance(name: string, type: string): Promise<Insta
       mqttPort: 1883,
       mqttTlsPort: 8883,
       cloudamqpId: `mock_${mockId}`,
-      apikey: `mock_apikey_${mockId}`,
     };
   }
 
@@ -109,7 +104,6 @@ async function createAndFetchInstance(name: string, type: string): Promise<Insta
 
   const instanceId = String(created.id);
   const amqpUrl: string = created.url || "";
-
   const { username, password, hostname, vhost } = parseAmqpUrl(amqpUrl);
 
   let mqttHostname = hostname;
@@ -117,14 +111,10 @@ async function createAndFetchInstance(name: string, type: string): Promise<Insta
 
   try {
     const details = await cloudamqpGet(`/instances/${instanceId}`);
-    if (details?.urls?.hostname_external) {
-      mqttHostname = details.urls.hostname_external;
-    }
-    if (details?.management_url) {
-      managementUrl = details.management_url;
-    }
-  } catch (e) {
-    console.log(`[cloudamqp] Could not fetch instance details: ${e}`);
+    if (details?.urls?.hostname_external) mqttHostname = details.urls.hostname_external;
+    if (details?.management_url) managementUrl = details.management_url;
+  } catch {
+    /* use defaults */
   }
 
   return {
@@ -138,25 +128,39 @@ async function createAndFetchInstance(name: string, type: string): Promise<Insta
     mqttPort: 1883,
     mqttTlsPort: 8883,
     cloudamqpId: instanceId,
-    apikey: created.apikey || "",
   };
 }
 
-Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 200, headers: corsHeaders });
+async function resolveUniqueName(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  requestedName: string
+): Promise<string> {
+  const { data: existing } = await supabase
+    .from("applications")
+    .select("name")
+    .eq("user_id", userId)
+    .is("deleted_at", null);
+
+  const names = new Set((existing || []).map((r: { name: string }) => r.name.toLowerCase()));
+
+  const base = requestedName.trim().toLowerCase();
+  if (!names.has(base)) return requestedName.trim();
+
+  for (let i = 2; i <= 99; i++) {
+    const candidate = `${requestedName.trim()}-${i}`;
+    if (!names.has(candidate.toLowerCase())) return candidate;
   }
+
+  return `${requestedName.trim()}-${Date.now()}`;
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") return new Response(null, { status: 200, headers: corsHeaders });
 
   try {
     const authHeader = req.headers.get("Authorization");
-    console.log("[create-application] Authorization present:", !!authHeader);
-
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Não autorizado" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (!authHeader) return jsonResponse({ success: false, error: "Não autorizado" }, 401);
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -170,72 +174,49 @@ Deno.serve(async (req: Request) => {
     );
 
     const { data: { user }, error: authError } = await userClient.auth.getUser();
-    console.log("[create-application] user:", user?.id, "authError:", authError?.message);
-
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Não autorizado", detail: authError?.message }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (authError || !user) return jsonResponse({ success: false, error: "Não autorizado" }, 401);
 
     let body: { name?: string; type?: string };
     try {
       body = await req.json();
     } catch {
-      return new Response(JSON.stringify({ error: "Payload inválido" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ success: false, error: "Payload inválido" }, 400);
     }
 
     const { name, type } = body;
-    console.log(`[create-application] Received: name=${name} type=${type}`);
-
-    if (!name || !type) {
-      return new Response(JSON.stringify({ error: "name e type são obrigatórios" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (!name || !type) return jsonResponse({ success: false, error: "name e type são obrigatórios" }, 400);
 
     const normalizedType = type.toLowerCase();
     if (!["rabbitmq", "lavinmq"].includes(normalizedType)) {
-      return new Response(
-        JSON.stringify({ error: `Tipo inválido: "${type}". Use rabbitmq ou lavinmq` }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ success: false, error: `Tipo inválido: "${type}". Use rabbitmq ou lavinmq` }, 400);
     }
 
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data: limitData } = await supabase
       .from("user_limits")
-      .select("last_created_at, max_apps")
+      .select("last_created_at")
       .eq("user_id", user.id)
       .maybeSingle();
 
     if (limitData?.last_created_at && limitData.last_created_at > twentyFourHoursAgo) {
       const nextAllowed = new Date(new Date(limitData.last_created_at).getTime() + 24 * 60 * 60 * 1000);
-      return new Response(
-        JSON.stringify({
-          error: "Limite de criação atingido",
-          message: "Você só pode criar 1 aplicação a cada 24 horas.",
-          next_allowed_at: nextAllowed.toISOString(),
-        }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({
+        success: false,
+        error: "Limite de criação atingido",
+        message: "Você só pode criar 1 aplicação a cada 24 horas.",
+        next_allowed_at: nextAllowed.toISOString(),
+      }, 429);
     }
 
-    const instance = await createAndFetchInstance(name, normalizedType);
-    console.log(`[create-application] Instance ready: id=${instance.cloudamqpId} host=${instance.hostname}`);
+    const finalName = await resolveUniqueName(supabase, user.id, name);
+    const instance = await provisionInstance(finalName, normalizedType);
 
     const now = new Date().toISOString();
-
     const { data: app, error: insertError } = await supabase
       .from("applications")
       .insert({
         user_id: user.id,
-        name,
+        name: finalName,
         type: normalizedType,
         cloudamqp_id: instance.cloudamqpId,
         amqp_url: instance.amqpUrl,
@@ -252,43 +233,40 @@ Deno.serve(async (req: Request) => {
       .select()
       .single();
 
-    if (insertError) {
-      console.log("[create-application] DB insert error:", insertError.message);
-      throw new Error(`Erro ao salvar aplicação: ${insertError.message}`);
-    }
+    if (insertError) throw new Error(`Erro ao salvar aplicação: ${insertError.message}`);
 
     await supabase
       .from("user_limits")
       .upsert({ user_id: user.id, last_created_at: now }, { onConflict: "user_id" });
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        application: {
-          id: app.id,
-          name: app.name,
-          type: app.type,
-          amqp_url: app.amqp_url,
-          username: app.amqp_user,
-          password: app.amqp_password,
-          cloudamqp_id: app.cloudamqp_id,
-          panel_url: app.panel_url,
-          mqtt_hostname: app.mqtt_host,
-          mqtt_port: app.mqtt_port,
-          mqtt_port_tls: app.mqtt_tls_port,
-          mqtt_username: app.mqtt_user,
-          mqtt_password: app.mqtt_password,
-          created_at: app.created_at,
-        },
-      }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    await supabase.from("app_events").insert({
+      user_id: user.id,
+      application_id: app.id,
+      event_type: "create",
+      meta: { name: finalName, type: normalizedType },
+    }).then(() => {});
+
+    return jsonResponse({
+      success: true,
+      application: {
+        id: app.id,
+        name: app.name,
+        type: app.type,
+        amqp_url: app.amqp_url,
+        username: app.amqp_user,
+        password: app.amqp_password,
+        cloudamqp_id: app.cloudamqp_id,
+        panel_url: app.panel_url,
+        mqtt_hostname: app.mqtt_host,
+        mqtt_port: app.mqtt_port,
+        mqtt_port_tls: app.mqtt_tls_port,
+        mqtt_username: app.mqtt_user,
+        mqtt_password: app.mqtt_password,
+        created_at: app.created_at,
+      },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erro interno do servidor";
-    console.log("[create-application] Unhandled error:", message);
-    return new Response(JSON.stringify({ error: message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ success: false, error: message }, 500);
   }
 });

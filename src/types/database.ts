@@ -35,3 +35,14 @@ export interface AdminUser {
   avatar_url?: string;
   applications: Application[];
 }
+
+export type AppEventType = "create" | "delete" | "update" | "rotate_password" | "error";
+
+export interface AppEvent {
+  id: string;
+  user_id: string;
+  application_id?: string;
+  event_type: AppEventType;
+  meta?: Record<string, unknown>;
+  created_at: string;
+}
