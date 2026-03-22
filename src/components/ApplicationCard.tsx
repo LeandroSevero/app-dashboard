@@ -50,6 +50,7 @@ export default function ApplicationCard({ app, onDelete, deleting }: Application
   const mqttUsername = app.mqtt_username || `${app.username}:${app.username}`;
   const mqttPassword = app.mqtt_password || app.password;
   const mqttHostname = app.mqtt_hostname || "";
+  const panelUrl = mqttHostname ? `https://${mqttHostname}/#/` : app.panel_url;
 
   return (
     <div
@@ -80,16 +81,23 @@ export default function ApplicationCard({ app, onDelete, deleting }: Application
         </div>
 
         <div className="mb-3">
-          <p className="text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--color-fg-muted)' }}>AMQP Details</p>
+          <p className="text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--color-fg-muted)' }}>Conexão do Painel Web</p>
           <div className="space-y-2">
-            <CredentialRow label="URL" value={app.amqp_url} field="url" copiedField={copiedField} onCopy={copyToClipboard} />
-            <CredentialRow label="Usuário" value={app.username} field="username" copiedField={copiedField} onCopy={copyToClipboard} />
+            <CredentialRow label="Hostname" value={mqttHostname} field="mqtt_host" copiedField={copiedField} onCopy={copyToClipboard} />
+            <CredentialRow
+              label="Portas"
+              value={`${app.mqtt_port ?? 1883} (${app.mqtt_port_tls ?? 8883} TLS)`}
+              field="mqtt_ports"
+              copiedField={copiedField}
+              onCopy={copyToClipboard}
+            />
+            <CredentialRow label="Usuário" value={mqttUsername} field="mqtt_user" copiedField={copiedField} onCopy={copyToClipboard} />
             <PasswordRow
               label="Senha"
-              value={app.password}
-              field="password"
-              show={showPassword}
-              onToggleShow={() => setShowPassword(!showPassword)}
+              value={mqttPassword}
+              field="mqtt_pass"
+              show={showMqttPassword}
+              onToggleShow={() => setShowMqttPassword(!showMqttPassword)}
               copiedField={copiedField}
               onCopy={copyToClipboard}
             />
@@ -105,27 +113,20 @@ export default function ApplicationCard({ app, onDelete, deleting }: Application
             border: '1px solid var(--color-border)',
           }}
         >
-          <span>MQTT Details</span>
+          <span>Conexão da Aplicação</span>
           {showMqtt ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
         </button>
 
         {showMqtt && (
           <div className="mt-2 space-y-2">
-            <CredentialRow label="Hostname" value={mqttHostname} field="mqtt_host" copiedField={copiedField} onCopy={copyToClipboard} />
-            <CredentialRow
-              label="Ports"
-              value={`${app.mqtt_port ?? 1883} (${app.mqtt_port_tls ?? 8883} for TLS)`}
-              field="mqtt_ports"
-              copiedField={copiedField}
-              onCopy={copyToClipboard}
-            />
-            <CredentialRow label="Username" value={mqttUsername} field="mqtt_user" copiedField={copiedField} onCopy={copyToClipboard} />
+            <CredentialRow label="URL" value={app.amqp_url} field="url" copiedField={copiedField} onCopy={copyToClipboard} />
+            <CredentialRow label="Usuário" value={app.username} field="username" copiedField={copiedField} onCopy={copyToClipboard} />
             <PasswordRow
-              label="Password"
-              value={mqttPassword}
-              field="mqtt_pass"
-              show={showMqttPassword}
-              onToggleShow={() => setShowMqttPassword(!showMqttPassword)}
+              label="Senha"
+              value={app.password}
+              field="password"
+              show={showPassword}
+              onToggleShow={() => setShowPassword(!showPassword)}
               copiedField={copiedField}
               onCopy={copyToClipboard}
             />
@@ -137,9 +138,9 @@ export default function ApplicationCard({ app, onDelete, deleting }: Application
         className="flex items-center gap-2 px-5 py-3"
         style={{ borderTop: '1px solid var(--color-border)' }}
       >
-        {app.panel_url && (
+        {panelUrl && (
           <a
-            href={app.panel_url}
+            href={panelUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all"
