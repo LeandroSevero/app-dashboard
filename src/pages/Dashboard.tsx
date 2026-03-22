@@ -13,6 +13,7 @@ import Sidebar from "../components/Sidebar";
 import Header from "../components/Header";
 import ApplicationCard from "../components/ApplicationCard";
 import CreateApplicationModal from "../components/CreateApplicationModal";
+import ApplicationDetailModal from "../components/ApplicationDetailModal";
 import UserProfile, { calcCompletion } from "../components/UserProfile";
 import ProfileIncompletePopup from "../components/ProfileIncompletePopup";
 import { listApplications, createApplication, deleteApplication } from "../lib/api";
@@ -28,6 +29,7 @@ export default function Dashboard() {
   const [appsError, setAppsError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [detailApp, setDetailApp] = useState<Application | null>(null);
 
   const [profileCompletion, setProfileCompletion] = useState(100);
   const [showProfilePopup, setShowProfilePopup] = useState(false);
@@ -113,6 +115,7 @@ export default function Dashboard() {
               onDelete={handleDelete}
               onRefresh={fetchApplications}
               onOpenCreate={() => setShowCreateModal(true)}
+              onViewDetails={setDetailApp}
             />
           )}
           {activeSection === "profile" && (
@@ -127,6 +130,13 @@ export default function Dashboard() {
         <CreateApplicationModal
           onClose={() => setShowCreateModal(false)}
           onCreate={handleCreate}
+        />
+      )}
+
+      {detailApp && (
+        <ApplicationDetailModal
+          app={detailApp}
+          onClose={() => setDetailApp(null)}
         />
       )}
 
@@ -220,6 +230,7 @@ interface ApplicationsSectionProps {
   onDelete: (id: string) => void;
   onRefresh: () => void;
   onOpenCreate: () => void;
+  onViewDetails: (app: Application) => void;
 }
 
 function ApplicationsSection({
@@ -230,6 +241,7 @@ function ApplicationsSection({
   onDelete,
   onRefresh,
   onOpenCreate,
+  onViewDetails,
 }: ApplicationsSectionProps) {
   return (
     <div className="space-y-6">
@@ -292,6 +304,7 @@ function ApplicationsSection({
               app={app}
               onDelete={onDelete}
               deleting={deletingId === app.id}
+              onViewDetails={onViewDetails}
             />
           ))}
         </div>

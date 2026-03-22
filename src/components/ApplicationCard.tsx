@@ -10,6 +10,7 @@ import {
   Zap,
   ChevronDown,
   ChevronUp,
+  BarChart3,
 } from "lucide-react";
 import type { Application } from "../types/database";
 
@@ -17,9 +18,10 @@ interface ApplicationCardProps {
   app: Application;
   onDelete: (id: string) => void;
   deleting: boolean;
+  onViewDetails: (app: Application) => void;
 }
 
-export default function ApplicationCard({ app, onDelete, deleting }: ApplicationCardProps) {
+export default function ApplicationCard({ app, onDelete, deleting, onViewDetails }: ApplicationCardProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [showMqttPassword, setShowMqttPassword] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -138,6 +140,18 @@ export default function ApplicationCard({ app, onDelete, deleting }: Application
         className="flex items-center gap-2 px-5 py-3"
         style={{ borderTop: '1px solid var(--color-border)' }}
       >
+        <button
+          onClick={() => onViewDetails(app)}
+          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all"
+          style={{
+            color: 'var(--color-fg-muted)',
+            background: 'var(--color-bg-secondary)',
+            border: '1px solid var(--color-border)',
+          }}
+        >
+          <BarChart3 className="w-3 h-3" />
+          Ver detalhes
+        </button>
         {panelUrl && (
           <a
             href={panelUrl}
