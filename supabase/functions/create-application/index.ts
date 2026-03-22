@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { MongoClient } from "npm:mongodb@6";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,6 +10,7 @@ const corsHeaders = {
 
 const CLOUDAMQP_API_KEY = Deno.env.get("CLOUDAMQP_API_KEY") || "";
 const CLOUDAMQP_BASE_URL = "https://customer.cloudamqp.com/api";
+const MONGODB_URI = Deno.env.get("aplicacoes_MONGODB_URI") || "";
 
 const PLAN_MAP: Record<string, string> = {
   rabbitmq: "lemur",
@@ -36,6 +38,13 @@ function parseAmqpUrl(url: string): { username: string; password: string; hostna
   }
 }
 
+function generateSecurePassword(length = 24): string {
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
+  const arr = new Uint8Array(length);
+  crypto.getRandomValues(arr);
+  return Array.from(arr).map((b) => chars[b % chars.length]).join("");
+}
+
 async function cloudamqpGet(path: string) {
   const credentials = btoa(`:${CLOUDAMQP_API_KEY}`);
   const res = await fetch(`${CLOUDAMQP_BASE_URL}${path}`, {
@@ -61,7 +70,7 @@ async function cloudamqpPost(path: string, body: unknown) {
   return JSON.parse(text);
 }
 
-interface InstanceDetails {
+interface AmqpInstanceDetails {
   amqpUrl: string;
   username: string;
   password: string;
@@ -74,7 +83,14 @@ interface InstanceDetails {
   cloudamqpId: string;
 }
 
-async function provisionInstance(name: string, type: string): Promise<InstanceDetails> {
+interface MongoInstanceDetails {
+  connectionUrl: string;
+  dbName: string;
+  dbUser: string;
+  dbPassword: string;
+}
+
+async function provisionAmqpInstance(name: string, type: string): Promise<AmqpInstanceDetails> {
   const plan = PLAN_MAP[type];
   if (!plan) throw new Error(`Tipo inválido: "${type}". Use rabbitmq ou lavinmq`);
 
@@ -129,6 +145,56 @@ async function provisionInstance(name: string, type: string): Promise<InstanceDe
     mqttTlsPort: 8883,
     cloudamqpId: instanceId,
   };
+}
+
+async function provisionMongoInstance(userId: string): Promise<MongoInstanceDetails> {
+  const shortId = userId.replace(/-/g, "").substring(0, 12);
+  const dbName = `app_${shortId}`;
+  const dbUser = `user_${shortId}`;
+  const dbPassword = generateSecurePassword(24);
+
+  if (!MONGODB_URI) {
+    const mockHost = "cluster0.example.mongodb.net";
+    return {
+      connectionUrl: `mongodb+srv://${dbUser}:${encodeURIComponent(dbPassword)}@${mockHost}/${dbName}?retryWrites=true&w=majority`,
+      dbName,
+      dbUser,
+      dbPassword,
+    };
+  }
+
+  const client = new MongoClient(MONGODB_URI);
+
+  try {
+    await client.connect();
+
+    const adminDb = client.db("admin");
+
+    try {
+      await adminDb.command({
+        dropUser: dbUser,
+      });
+    } catch {
+      /* user may not exist yet, ignore */
+    }
+
+    await adminDb.command({
+      createUser: dbUser,
+      pwd: dbPassword,
+      roles: [{ role: "readWrite", db: dbName }],
+    });
+
+    await client.db(dbName).collection("init").insertOne({ createdAt: new Date() });
+
+    const parsedUri = new URL(MONGODB_URI.replace("mongodb+srv://", "https://"));
+    const clusterHost = parsedUri.hostname;
+
+    const connectionUrl = `mongodb+srv://${dbUser}:${encodeURIComponent(dbPassword)}@${clusterHost}/${dbName}?retryWrites=true&w=majority`;
+
+    return { connectionUrl, dbName, dbUser, dbPassword };
+  } finally {
+    await client.close();
+  }
 }
 
 async function resolveUniqueName(
@@ -187,8 +253,8 @@ Deno.serve(async (req: Request) => {
     if (!name || !type) return jsonResponse({ success: false, error: "name e type são obrigatórios" }, 400);
 
     const normalizedType = type.toLowerCase();
-    if (!["rabbitmq", "lavinmq"].includes(normalizedType)) {
-      return jsonResponse({ success: false, error: `Tipo inválido: "${type}". Use rabbitmq ou lavinmq` }, 400);
+    if (!["rabbitmq", "lavinmq", "mongodb"].includes(normalizedType)) {
+      return jsonResponse({ success: false, error: `Tipo inválido: "${type}". Use rabbitmq, lavinmq ou mongodb` }, 400);
     }
 
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -201,21 +267,65 @@ Deno.serve(async (req: Request) => {
 
     if (limitData?.last_created_at && limitData.last_created_at > twentyFourHoursAgo) {
       const nextAllowed = new Date(new Date(limitData.last_created_at).getTime() + 24 * 60 * 60 * 1000);
+      const typeLabel = normalizedType === "rabbitmq" ? "RabbitMQ" : normalizedType === "lavinmq" ? "LavinMQ" : "MongoDB";
       return jsonResponse({
         success: false,
         error: "Limite de criação atingido",
-        message: `Você só pode criar 1 ${normalizedType === "rabbitmq" ? "RabbitMQ" : "LavinMQ"} a cada 24 horas.`,
+        message: `Você só pode criar 1 ${typeLabel} a cada 24 horas.`,
         next_allowed_at: nextAllowed.toISOString(),
       }, 429);
     }
 
     const finalName = await resolveUniqueName(supabase, user.id, name);
-    const instance = await provisionInstance(finalName, normalizedType);
-
     const now = new Date().toISOString();
-    const { data: app, error: insertError } = await supabase
-      .from("applications")
-      .insert({
+
+    let insertData: Record<string, unknown>;
+    let responseApplication: Record<string, unknown>;
+
+    if (normalizedType === "mongodb") {
+      const mongo = await provisionMongoInstance(user.id);
+
+      insertData = {
+        user_id: user.id,
+        name: finalName,
+        type: normalizedType,
+        amqp_url: "",
+        amqp_user: mongo.dbUser,
+        amqp_password: mongo.dbPassword,
+        mongo_db: mongo.dbName,
+        mongo_user: mongo.dbUser,
+        mongo_password: mongo.dbPassword,
+        connection_url: mongo.connectionUrl,
+        created_at: now,
+      };
+
+      const { data: app, error: insertError } = await supabase
+        .from("applications")
+        .insert(insertData)
+        .select()
+        .single();
+
+      if (insertError) throw new Error(`Erro ao salvar aplicação: ${insertError.message}`);
+
+      responseApplication = {
+        id: app.id,
+        name: app.name,
+        type: app.type,
+        username: mongo.dbUser,
+        password: mongo.dbPassword,
+        mongo_db: mongo.dbName,
+        mongo_user: mongo.dbUser,
+        mongo_password: mongo.dbPassword,
+        connection_url: mongo.connectionUrl,
+        amqp_url: "",
+        cloudamqp_id: "",
+        panel_url: "",
+        created_at: app.created_at,
+      };
+    } else {
+      const instance = await provisionAmqpInstance(finalName, normalizedType);
+
+      insertData = {
         user_id: user.id,
         name: finalName,
         type: normalizedType,
@@ -230,26 +340,17 @@ Deno.serve(async (req: Request) => {
         mqtt_user: instance.username,
         mqtt_password: instance.password,
         created_at: now,
-      })
-      .select()
-      .single();
+      };
 
-    if (insertError) throw new Error(`Erro ao salvar aplicação: ${insertError.message}`);
+      const { data: app, error: insertError } = await supabase
+        .from("applications")
+        .insert(insertData)
+        .select()
+        .single();
 
-    await supabase
-      .from("user_limits")
-      .upsert({ user_id: user.id, app_type: normalizedType, last_created_at: now }, { onConflict: "user_id,app_type" });
+      if (insertError) throw new Error(`Erro ao salvar aplicação: ${insertError.message}`);
 
-    await supabase.from("app_events").insert({
-      user_id: user.id,
-      application_id: app.id,
-      event_type: "create",
-      meta: { name: finalName, type: normalizedType },
-    }).then(() => {});
-
-    return jsonResponse({
-      success: true,
-      application: {
+      responseApplication = {
         id: app.id,
         name: app.name,
         type: app.type,
@@ -264,8 +365,21 @@ Deno.serve(async (req: Request) => {
         mqtt_username: app.mqtt_user,
         mqtt_password: app.mqtt_password,
         created_at: app.created_at,
-      },
-    });
+      };
+    }
+
+    await supabase
+      .from("user_limits")
+      .upsert({ user_id: user.id, app_type: normalizedType, last_created_at: now }, { onConflict: "user_id,app_type" });
+
+    await supabase.from("app_events").insert({
+      user_id: user.id,
+      application_id: (responseApplication as { id: string }).id,
+      event_type: "create",
+      meta: { name: finalName, type: normalizedType },
+    }).then(() => {});
+
+    return jsonResponse({ success: true, application: responseApplication });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erro interno do servidor";
     return jsonResponse({ success: false, error: message }, 500);

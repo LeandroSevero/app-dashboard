@@ -742,6 +742,8 @@ function AdminAppRow({ app, onUpdated, onDeleted }: AdminAppRowProps) {
 
   const typeColor = app.type === "lavinmq"
     ? { color: '#06b6d4', bg: 'rgba(6,182,212,0.08)', border: 'rgba(6,182,212,0.2)' }
+    : app.type === "mongodb"
+    ? { color: '#22c55e', bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.2)' }
     : { color: '#f97316', bg: 'rgba(249,115,22,0.08)', border: 'rgba(249,115,22,0.2)' };
 
   async function handleRename() {
@@ -795,6 +797,8 @@ function AdminAppRow({ app, onUpdated, onDeleted }: AdminAppRowProps) {
         >
           {app.type === "lavinmq"
             ? <img src="/LavinMQ.svg" alt="LavinMQ" className="w-5 h-5" />
+            : app.type === "mongodb"
+            ? <Server className="w-5 h-5" style={{ color: '#22c55e' }} />
             : <img src="/RabbitMQ.svg" alt="RabbitMQ" className="w-5 h-5" />
           }
         </div>
@@ -825,7 +829,7 @@ function AdminAppRow({ app, onUpdated, onDeleted }: AdminAppRowProps) {
                 className="text-xs px-1.5 py-0.5 rounded-md flex-shrink-0"
                 style={{ color: typeColor.color, background: typeColor.bg, border: `1px solid ${typeColor.border}` }}
               >
-                {app.type === "lavinmq" ? "LavinMQ" : "RabbitMQ"}
+                {app.type === "lavinmq" ? "LavinMQ" : app.type === "mongodb" ? "MongoDB" : "RabbitMQ"}
               </span>
             </div>
           )}
@@ -930,23 +934,37 @@ function AdminAppRow({ app, onUpdated, onDeleted }: AdminAppRowProps) {
           className="mx-6 mb-4 rounded-xl p-4 space-y-4"
           style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}
         >
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--color-fg-muted)' }}>Conexão do Painel Web</p>
-            <div className="space-y-2">
-              <CredRow label="Hostname" value={app.mqtt_hostname || ""} />
-              <CredRow label="Porta" value={`${app.mqtt_port || 1883} / ${app.mqtt_port_tls || 8883} (TLS)`} />
-              <CredRow label="Usuário" value={app.mqtt_username || app.username} />
-              <CredRow label="Senha" value={app.mqtt_password || app.password} secret />
+          {app.type === "mongodb" ? (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--color-fg-muted)' }}>Conexão</p>
+              <div className="space-y-2">
+                <CredRow label="Connection String" value={app.connection_url || ""} secret />
+                <CredRow label="Database" value={app.mongo_db || ""} />
+                <CredRow label="Usuário" value={app.mongo_user || ""} />
+                <CredRow label="Senha" value={app.mongo_password || ""} secret />
+              </div>
             </div>
-          </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--color-fg-muted)' }}>Conexão da Aplicação</p>
-            <div className="space-y-2">
-              <CredRow label="URL" value={app.amqp_url} secret />
-              <CredRow label="Usuário" value={app.username} />
-              <CredRow label="Senha" value={app.password} secret />
-            </div>
-          </div>
+          ) : (
+            <>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--color-fg-muted)' }}>Conexão do Painel Web</p>
+                <div className="space-y-2">
+                  <CredRow label="Hostname" value={app.mqtt_hostname || ""} />
+                  <CredRow label="Porta" value={`${app.mqtt_port || 1883} / ${app.mqtt_port_tls || 8883} (TLS)`} />
+                  <CredRow label="Usuário" value={app.mqtt_username || app.username} />
+                  <CredRow label="Senha" value={app.mqtt_password || app.password} secret />
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--color-fg-muted)' }}>Conexão da Aplicação</p>
+                <div className="space-y-2">
+                  <CredRow label="URL" value={app.amqp_url} secret />
+                  <CredRow label="Usuário" value={app.username} />
+                  <CredRow label="Senha" value={app.password} secret />
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

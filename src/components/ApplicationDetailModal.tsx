@@ -13,6 +13,7 @@ import {
   BarChart3,
   AlertCircle,
   Wifi,
+  Database,
 } from "lucide-react";
 import type { Application } from "../types/database";
 import { invokeWithAuth } from "../lib/supabase";
@@ -99,12 +100,12 @@ export default function ApplicationDetailModal({ app, onClose }: ApplicationDeta
   const [showPassword, setShowPassword] = useState(false);
   const [showMqttPassword, setShowMqttPassword] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"limits" | "queues" | "credentials">("limits");
-
+  const isMongoDB = app.type === "mongodb";
+  const [activeTab, setActiveTab] = useState<"limits" | "queues" | "credentials">(isMongoDB ? "credentials" : "limits");
   const isLavinMQ = app.type === "lavinmq";
   const limits = isLavinMQ ? LAVINMQ_LIMITS : RABBITMQ_LIMITS;
-  const typeLabel = isLavinMQ ? "LavinMQ" : "RabbitMQ";
-  const typeColor = isLavinMQ ? "#06b6d4" : "#f97316";
+  const typeLabel = isMongoDB ? "MongoDB" : isLavinMQ ? "LavinMQ" : "RabbitMQ";
+  const typeColor = isMongoDB ? "#22c55e" : isLavinMQ ? "#06b6d4" : "#f97316";
 
   const mqttHostname = app.mqtt_hostname || "";
   const mqttUsername = app.mqtt_username || app.username;
@@ -174,7 +175,9 @@ export default function ApplicationDetailModal({ app, onClose }: ApplicationDeta
               className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
               style={{ background: "var(--color-bg-secondary)", border: "1px solid var(--color-border)" }}
             >
-              {isLavinMQ
+              {isMongoDB
+                ? <Database className="w-5 h-5" style={{ color: '#22c55e' }} />
+                : isLavinMQ
                 ? <img src="/LavinMQ.svg" alt="LavinMQ" className="w-5 h-5" />
                 : <img src="/RabbitMQ.svg" alt="RabbitMQ" className="w-5 h-5" />}
             </div>
@@ -212,38 +215,43 @@ export default function ApplicationDetailModal({ app, onClose }: ApplicationDeta
           </div>
         </div>
 
-        {/* Live Stats Bar */}
-        <div
-          className="grid grid-cols-3 gap-0 flex-shrink-0"
-          style={{ borderBottom: "1px solid var(--color-border)" }}
-        >
-          <StatPill
-            icon={<Wifi className="w-3.5 h-3.5" />}
-            label="Conexões"
-            value={loadingStats && !stats ? "—" : String(connections)}
-            color="#06b6d4"
-          />
-          <StatPill
-            icon={<Users className="w-3.5 h-3.5" />}
-            label="Consumidores"
-            value={loadingStats && !stats ? "—" : String(consumers)}
-            color="#10b981"
-            bordered
-          />
-          <StatPill
-            icon={<MessageSquare className="w-3.5 h-3.5" />}
-            label="Mensagens"
-            value={loadingStats && !stats ? "—" : formatNumber(totalMessages)}
-            color="#f59e0b"
-          />
-        </div>
+        {/* Live Stats Bar — hidden for MongoDB */}
+        {!isMongoDB && (
+          <div
+            className="grid grid-cols-3 gap-0 flex-shrink-0"
+            style={{ borderBottom: "1px solid var(--color-border)" }}
+          >
+            <StatPill
+              icon={<Wifi className="w-3.5 h-3.5" />}
+              label="Conexões"
+              value={loadingStats && !stats ? "—" : String(connections)}
+              color="#06b6d4"
+            />
+            <StatPill
+              icon={<Users className="w-3.5 h-3.5" />}
+              label="Consumidores"
+              value={loadingStats && !stats ? "—" : String(consumers)}
+              color="#10b981"
+              bordered
+            />
+            <StatPill
+              icon={<MessageSquare className="w-3.5 h-3.5" />}
+              label="Mensagens"
+              value={loadingStats && !stats ? "—" : formatNumber(totalMessages)}
+              color="#f59e0b"
+            />
+          </div>
+        )}
 
         {/* Tabs */}
         <div
           className="flex flex-shrink-0"
           style={{ borderBottom: "1px solid var(--color-border)" }}
         >
-          {(["limits", "queues", "credentials"] as const).map((tab) => (
+          {(isMongoDB
+            ? (["credentials"] as const)
+            : (["limits", "queues", "credentials"] as const)
+          ).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -422,7 +430,39 @@ export default function ApplicationDetailModal({ app, onClose }: ApplicationDeta
             </div>
           )}
 
-          {activeTab === "credentials" && (
+          {activeTab === "credentials" && isMongoDB && (
+            <div className="p-5 space-y-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--color-fg-muted)" }}>
+                  Conexão
+                </p>
+                <div className="space-y-2">
+                  <PassRow
+                    label="Connection String"
+                    value={app.connection_url || ""}
+                    field="connurl"
+                    show={showPassword}
+                    onToggle={() => setShowPassword(!showPassword)}
+                    copiedField={copiedField}
+                    onCopy={copyToClipboard}
+                  />
+                  <CredRow label="Database" value={app.mongo_db || ""} field="mongodb" copiedField={copiedField} onCopy={copyToClipboard} />
+                  <CredRow label="Usuário" value={app.mongo_user || ""} field="mongouser" copiedField={copiedField} onCopy={copyToClipboard} />
+                  <PassRow
+                    label="Senha"
+                    value={app.mongo_password || ""}
+                    field="mongopass"
+                    show={showMqttPassword}
+                    onToggle={() => setShowMqttPassword(!showMqttPassword)}
+                    copiedField={copiedField}
+                    onCopy={copyToClipboard}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "credentials" && !isMongoDB && (
             <div className="p-5 space-y-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--color-fg-muted)" }}>

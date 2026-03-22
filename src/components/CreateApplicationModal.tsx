@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { X, Loader2, Plus, Clock } from "lucide-react";
+import { X, Loader2, Plus, Clock, Database } from "lucide-react";
 
 interface CreateApplicationModalProps {
   onClose: () => void;
   onCreate: (name: string, type: string) => Promise<{ error?: string; next_allowed_at?: string }>;
 }
 
-type AppType = "rabbitmq" | "lavinmq";
+type AppType = "rabbitmq" | "lavinmq" | "mongodb";
 
 interface TypeLimit {
   blocked: boolean;
@@ -20,6 +20,7 @@ export default function CreateApplicationModal({ onClose, onCreate }: CreateAppl
   const [limits, setLimits] = useState<Record<AppType, TypeLimit>>({
     rabbitmq: { blocked: false, next_allowed_at: null },
     lavinmq: { blocked: false, next_allowed_at: null },
+    mongodb: { blocked: false, next_allowed_at: null },
   });
 
   const currentLimit = limits[type];
@@ -54,6 +55,12 @@ export default function CreateApplicationModal({ onClose, onCreate }: CreateAppl
     });
   }
 
+  function typeLabel(t: AppType) {
+    if (t === "rabbitmq") return "RabbitMQ";
+    if (t === "lavinmq") return "LavinMQ";
+    return "MongoDB";
+  }
+
   return (
     <div
       className="fixed inset-0 backdrop-blur-sm z-50 flex items-center justify-center p-4"
@@ -70,7 +77,7 @@ export default function CreateApplicationModal({ onClose, onCreate }: CreateAppl
         >
           <div>
             <h2 className="font-semibold text-base" style={{ color: 'var(--color-fg)' }}>Nova Aplicação</h2>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--color-fg-muted)' }}>Crie uma nova instância de mensageria</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--color-fg-muted)' }}>Crie uma nova instância</p>
           </div>
           <button
             onClick={onClose}
@@ -106,7 +113,7 @@ export default function CreateApplicationModal({ onClose, onCreate }: CreateAppl
             <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-fg)' }}>
               Tipo de instância
             </label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-2.5">
               <TypeOption
                 value="rabbitmq"
                 selected={type === "rabbitmq"}
@@ -127,13 +134,23 @@ export default function CreateApplicationModal({ onClose, onCreate }: CreateAppl
                 color="cyan"
                 blocked={limits.lavinmq.blocked}
               />
+              <TypeOption
+                value="mongodb"
+                selected={type === "mongodb"}
+                onSelect={() => setType("mongodb")}
+                icon={<Database className="w-5 h-5" style={{ color: '#22c55e' }} />}
+                label="MongoDB"
+                description="Banco de dados"
+                color="green"
+                blocked={limits.mongodb.blocked}
+              />
             </div>
           </div>
 
           {currentLimit.blocked && currentLimit.next_allowed_at && (
             <div className="rounded-xl px-4 py-3 space-y-1" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
               <p className="text-sm font-medium" style={{ color: '#ef4444' }}>
-                Limite de criação atingido para {type === "rabbitmq" ? "RabbitMQ" : "LavinMQ"}
+                Limite de criação atingido para {typeLabel(type)}
               </p>
               <div className="flex items-center gap-1.5 text-xs" style={{ color: 'rgba(239,68,68,0.7)' }}>
                 <Clock className="w-3 h-3" />
@@ -187,15 +204,19 @@ interface TypeOptionProps {
   icon: React.ReactNode;
   label: string;
   description: string;
-  color: "orange" | "cyan";
+  color: "orange" | "cyan" | "green";
   blocked: boolean;
 }
 
 function TypeOption({ selected, onSelect, icon, label, description, color, blocked }: TypeOptionProps) {
+  const colorMap = {
+    orange: { border: 'rgba(249,115,22,0.35)', bg: 'rgba(249,115,22,0.05)' },
+    cyan: { border: 'rgba(6,182,212,0.35)', bg: 'rgba(6,182,212,0.05)' },
+    green: { border: 'rgba(34,197,94,0.35)', bg: 'rgba(34,197,94,0.05)' },
+  };
+
   const selectedStyle = selected
-    ? color === "orange"
-      ? { border: '1px solid rgba(249,115,22,0.35)', background: 'rgba(249,115,22,0.05)' }
-      : { border: '1px solid rgba(6,182,212,0.35)', background: 'rgba(6,182,212,0.05)' }
+    ? { border: `1px solid ${colorMap[color].border}`, background: colorMap[color].bg }
     : { border: '1px solid var(--color-border)', background: 'var(--color-bg-secondary)' };
 
   return (

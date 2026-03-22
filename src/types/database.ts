@@ -13,6 +13,10 @@ export interface Application {
   mqtt_password?: string;
   mqtt_port?: number;
   mqtt_port_tls?: number;
+  mongo_db?: string;
+  mongo_user?: string;
+  mongo_password?: string;
+  connection_url?: string;
 }
 
 export interface UserProfile {
