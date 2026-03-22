@@ -201,7 +201,7 @@ export default function AdminDashboard() {
           )}
 
           {activeSection === "admin-resources" && (
-            <ResourcesTab apps={allApps} loading={usersLoading} onRefresh={fetchUsers} stats={stats} />
+            <ResourcesTab apps={allApps} loading={usersLoading} onRefresh={fetchUsers} />
           )}
 
           {activeSection === "admin-logs" && (
@@ -822,10 +822,15 @@ interface ResourcesTabProps {
   apps: AppWithOwner[];
   loading: boolean;
   onRefresh: () => void;
-  stats: AdminStats | null;
 }
 
-function ResourcesTab({ apps, loading, onRefresh, stats }: ResourcesTabProps) {
+function ResourcesTab({ apps, loading, onRefresh }: ResourcesTabProps) {
+  const [stats, setStats] = useState<AdminStats | null>(null);
+
+  useEffect(() => {
+    adminGetStats().then(({ stats: s }) => { if (s) setStats(s); });
+  }, []);
+
   const mongoApps = apps.filter((a) => a.type === "mongodb");
   const rabbitApps = apps.filter((a) => a.type === "rabbitmq");
   const lavinApps = apps.filter((a) => a.type === "lavinmq");

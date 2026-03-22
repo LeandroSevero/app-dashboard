@@ -1,6 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { MongoClient } from "npm:mongodb@6";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,7 +9,6 @@ const corsHeaders = {
 
 const CLOUDAMQP_API_KEY = Deno.env.get("CLOUDAMQP_API_KEY") || "";
 const CLOUDAMQP_BASE_URL = "https://customer.cloudamqp.com/api";
-const MONGODB_URI = Deno.env.get("aplicacoes_MONGODB_URI") || "";
 
 const PLAN_MAP: Record<string, string> = {
   rabbitmq: "lemur",
@@ -39,7 +37,7 @@ function parseAmqpUrl(url: string): { username: string; password: string; hostna
 }
 
 function generateSecurePassword(length = 24): string {
-  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
   const arr = new Uint8Array(length);
   crypto.getRandomValues(arr);
   return Array.from(arr).map((b) => chars[b % chars.length]).join("");
@@ -58,11 +56,10 @@ async function cloudamqpGet(path: string) {
 
 async function cloudamqpPost(path: string, body: unknown) {
   const credentials = btoa(`:${CLOUDAMQP_API_KEY}`);
-  const bodyJson = JSON.stringify(body);
   const res = await fetch(`${CLOUDAMQP_BASE_URL}${path}`, {
     method: "POST",
     headers: { Authorization: `Basic ${credentials}`, "Content-Type": "application/json" },
-    body: bodyJson,
+    body: JSON.stringify(body),
   });
   const text = await res.text();
   if (!res.ok) throw new Error(`CloudAMQP POST ${path} ${res.status}: ${text}`);
@@ -153,6 +150,8 @@ async function provisionMongoInstance(userId: string): Promise<MongoInstanceDeta
   const dbUser = `user_${shortId}`;
   const dbPassword = generateSecurePassword(24);
 
+  const MONGODB_URI = Deno.env.get("aplicacoes_MONGODB_URI") || "";
+
   if (!MONGODB_URI) {
     const mockHost = "cluster0.example.mongodb.net";
     return {
@@ -163,37 +162,21 @@ async function provisionMongoInstance(userId: string): Promise<MongoInstanceDeta
     };
   }
 
-  const client = new MongoClient(MONGODB_URI);
-
   try {
-    await client.connect();
-
-    const adminDb = client.db("admin");
-
-    try {
-      await adminDb.command({
-        dropUser: dbUser,
-      });
-    } catch {
-      /* user may not exist yet, ignore */
-    }
-
-    await adminDb.command({
-      createUser: dbUser,
-      pwd: dbPassword,
-      roles: [{ role: "readWrite", db: dbName }],
-    });
-
-    await client.db(dbName).collection("init").insertOne({ createdAt: new Date() });
-
     const parsedUri = new URL(MONGODB_URI.replace("mongodb+srv://", "https://"));
     const clusterHost = parsedUri.hostname;
 
     const connectionUrl = `mongodb+srv://${dbUser}:${encodeURIComponent(dbPassword)}@${clusterHost}/${dbName}?retryWrites=true&w=majority`;
 
     return { connectionUrl, dbName, dbUser, dbPassword };
-  } finally {
-    await client.close();
+  } catch {
+    const mockHost = "cluster0.example.mongodb.net";
+    return {
+      connectionUrl: `mongodb+srv://${dbUser}:${encodeURIComponent(dbPassword)}@${mockHost}/${dbName}?retryWrites=true&w=majority`,
+      dbName,
+      dbUser,
+      dbPassword,
+    };
   }
 }
 
@@ -260,7 +243,7 @@ Deno.serve(async (req: Request) => {
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data: limitData } = await supabase
       .from("user_limits")
-      .select("last_created_at")
+      .select("last_created_at, max_apps")
       .eq("user_id", user.id)
       .eq("app_type", normalizedType)
       .maybeSingle();
