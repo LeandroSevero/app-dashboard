@@ -4,172 +4,174 @@ Painel SaaS autenticado para gerenciamento de infraestrutura e serviços DevOps.
 
 ## Visão Geral
 
-Aplicação React + TypeScript com backend Vercel Functions e MongoDB, voltada para `app.leandrosevero.com.br`. Painel logado (dashboard) separado do site estático principal, com dark mode, sidebar modular e estrutura preparada para crescimento.
+Aplicação React + TypeScript com backend Supabase (Edge Functions + PostgreSQL), voltada para `app.leandrosevero.com.br`. Painel logado separado do site estático principal, com suporte a dark/light mode, sidebar modular, painel de administração completo e integrações com CloudAMQP e MongoDB Atlas.
 
 ## Funcionalidades
 
 ### Autenticação
-- Login com e-mail e senha via JWT (armazenado em localStorage)
-- Registro automático de conta no primeiro acesso
+- Login com e-mail e senha via Supabase Auth
 - Proteção de rota (auth guard): apenas usuários autenticados acessam o dashboard
+- Gerenciamento de sessão com refresh automático de token
 - Logout com botão no header
 
-### Dashboard
-- Visão geral com contagem de aplicações por tipo (RabbitMQ / LavinMQ)
-- Módulos futuros exibidos com status "Em breve"
+### Dashboard (Usuário)
+- Visão geral com contagem de aplicações por tipo (RabbitMQ / LavinMQ / MongoDB)
+- Listagem de aplicações com credenciais (AMQP URL, username, password, connection string)
+- Criação de instâncias via modal com seleção de tipo
+- Rate limit: cooldown configurável por tipo de aplicação
+- Deleção de aplicações com confirmação dupla
+- Modal de detalhe com todas as credenciais e estatísticas da aplicação
 
-### Aplicações (CloudAMQP)
-- Criação de instâncias RabbitMQ e LavinMQ via API backend
-- Limite de 1 criação a cada 24 horas por usuário (mesmo após deletar)
-- Listagem com credenciais (AMQP URL, username, password)
-- Senha oculta por padrão com toggle de visibilidade
-- Botão copiar para cada credencial
-- Link externo para o painel CloudAMQP
-- Deleção com confirmação dupla
-- Estados: loading, empty state, erro de limite, sucesso
+### Painel Admin
+- **Dashboard**: estatísticas globais (usuários, aplicações, erros), gráficos de 7 dias
+- **Usuários**: listagem completa com e-mail, nome, perfil, aplicações e ações (editar, deletar, resetar senha)
+- **Aplicações Globais**: todas as instâncias da plataforma com filtro por tipo
+- **Recursos**: visão consolidada dos recursos de infraestrutura (MongoDB Atlas, RabbitMQ, LavinMQ)
+- **Logs**: eventos recentes da plataforma com filtro por tipo
+
+### Perfil
+- Edição de nome, telefone, bio e foto de perfil
+- Troca de e-mail e senha
+- Upload de avatar com preview
 
 ## Tecnologias
 
 - **React 18** + **TypeScript** - Frontend
 - **Vite** - Build tool
 - **Tailwind CSS** - Estilização
-- **Vercel Functions** - Backend serverless (Node.js)
-- **MongoDB** - Banco de dados
-- **jsonwebtoken** - Autenticação JWT
+- **Supabase** - Auth, banco de dados PostgreSQL e Edge Functions (Deno)
 - **Lucide React** - Ícones
-- **CloudAMQP API** - Instâncias de mensageria
+- **CloudAMQP API** - Instâncias de mensageria (RabbitMQ e LavinMQ)
+- **MongoDB Atlas API** - Instâncias de banco de dados
 
 ## Arquitetura
 
 ### Frontend (React)
 ```
 src/
-├── App.tsx                        # Raiz com AuthProvider e roteamento
-├── index.css                      # Estilos globais + scrollbar personalizada
-├── main.tsx                       # Entry point
+├── App.tsx                          # Raiz com AuthProvider, ThemeProvider e roteamento
+├── index.css                        # Estilos globais + variáveis CSS de tema
+├── main.tsx                         # Entry point
 ├── context/
-│   └── AuthContext.tsx            # Contexto JWT (useAuth) via localStorage
+│   ├── AuthContext.tsx              # Contexto de autenticação via Supabase Auth
+│   └── ThemeContext.tsx             # Contexto de dark/light mode
 ├── lib/
-│   ├── api.ts                     # Cliente HTTP com Authorization header
-│   └── supabase.ts                # Arquivo vazio (removido Supabase)
+│   ├── api.ts                       # Funções de acesso à API (orquestra os services)
+│   └── supabase.ts                  # Cliente Supabase + getValidToken + invokeWithAuth
+├── services/
+│   ├── adminService.ts              # Chamadas às edge functions de admin
+│   ├── applicationService.ts        # CRUD de aplicações
+│   ├── logService.ts                # Registro de eventos
+│   └── profileService.ts            # Leitura e atualização de perfil
 ├── types/
-│   └── database.ts                # Tipos TypeScript (Application)
+│   ├── api.ts                       # Tipos de resposta da API
+│   └── database.ts                  # Tipos do banco de dados
 ├── pages/
-│   ├── Login.tsx                  # Tela de login / cadastro
-│   └── Dashboard.tsx              # Painel principal autenticado
+│   ├── Login.tsx                    # Tela de login
+│   ├── Dashboard.tsx                # Painel do usuário
+│   └── AdminDashboard.tsx           # Painel administrativo
 └── components/
-    ├── Sidebar.tsx                # Navegação lateral colapsável
-    ├── Header.tsx                 # Cabeçalho com usuário e logout
-    ├── ApplicationCard.tsx        # Card de aplicação com credenciais
-    └── CreateApplicationModal.tsx # Modal de criação de aplicação
+    ├── Sidebar.tsx                  # Navegação lateral colapsável
+    ├── Header.tsx                   # Cabeçalho com usuário, tema e logout
+    ├── ApplicationCard.tsx          # Card de aplicação com credenciais
+    ├── ApplicationDetailModal.tsx   # Modal de detalhe de aplicação
+    ├── CreateApplicationModal.tsx   # Modal de criação de aplicação
+    ├── ProfileIncompletePopup.tsx   # Aviso de perfil incompleto
+    └── UserProfile.tsx              # Tela de edição de perfil
 ```
 
-### Backend (Vercel Functions)
+### Backend (Supabase Edge Functions)
 ```
-api/
-├── _lib/
-│   ├── db.js          # Conexão MongoDB (singleton por ambiente)
-│   ├── auth.js        # JWT sign/verify + CORS helpers
-│   └── cloudamqp.js   # Wrapper da API CloudAMQP
-├── auth/
-│   └── login.js       # POST /api/auth/login
-└── applications/
-    ├── create.js      # POST /api/applications/create
-    ├── list.js        # GET /api/applications/list
-    └── [id].js        # DELETE /api/applications/:id
+supabase/functions/
+├── admin-stats/           # Estatísticas globais para o painel admin
+├── admin-users/           # Listagem de todos os usuários
+├── admin-update-user/     # Atualização de dados de usuário (admin)
+├── admin-update-application/  # Renomear aplicação (admin)
+├── admin-logs/            # Logs de eventos da plataforma
+├── app-stats/             # Estatísticas de uma aplicação específica
+├── cloudamqp/             # Integração com CloudAMQP (criar/deletar instâncias)
+├── create-application/    # Criação de aplicação (RabbitMQ, LavinMQ, MongoDB)
+├── delete-application/    # Deleção de aplicação
+└── rotate-password/       # Rotação de senha de aplicação
 ```
 
-### Banco de Dados (MongoDB)
-| Collection | Descrição |
+### Banco de Dados (Supabase PostgreSQL)
+| Tabela | Descrição |
 |---|---|
-| `users` | Usuários cadastrados |
-| `applications` | Instâncias CloudAMQP |
-| `user_limits` | Controle de rate limit por usuário |
+| `profiles` | Perfis dos usuários (nome, telefone, bio, avatar, role) |
+| `applications` | Instâncias criadas (RabbitMQ, LavinMQ, MongoDB) |
+| `user_limits` | Controle de cooldown por tipo de aplicação por usuário |
+| `app_events` | Log de eventos das aplicações |
 
-#### Collection `applications`
+#### Tabela `applications`
 | Campo | Tipo | Descrição |
 |---|---|---|
-| userId | string | ID do usuário dono |
+| id | uuid | Identificador único |
+| user_id | uuid | Referência ao usuário dono |
 | name | string | Nome da aplicação |
-| type | string | `rabbitmq` ou `lavinmq` |
-| cloudamqpId | string | ID externo no CloudAMQP |
-| connection.url | string | AMQP URL de conexão |
-| connection.username | string | Usuário de acesso |
-| connection.password | string | Senha de acesso |
-| connection.managementUrl | string | URL do painel CloudAMQP |
-| createdAt | Date | Data de criação |
-| deletedAt | Date\|null | Data de deleção (soft delete) |
-
-#### Collection `user_limits`
-| Campo | Tipo | Descrição |
-|---|---|---|
-| userId | string | ID do usuário |
-| lastCreatedAt | Date | Última criação (para rate limit 24h) |
+| type | string | `rabbitmq`, `lavinmq` ou `mongodb` |
+| amqp_url | string | URL de conexão AMQP |
+| amqp_user | string | Usuário AMQP |
+| amqp_password | string | Senha AMQP |
+| cloudamqp_id | string | ID externo no CloudAMQP |
+| panel_url | string | URL do painel CloudAMQP |
+| mongo_db | string | Nome do banco MongoDB |
+| mongo_user | string | Usuário MongoDB |
+| mongo_password | string | Senha MongoDB |
+| connection_url | string | Connection string MongoDB |
+| deleted_at | timestamp | Soft delete |
 
 ## Segurança
 
-- Autenticação via JWT (assinado com `JWT_SECRET`)
-- API keys do CloudAMQP nunca expostas no frontend
-- Todas as operações de criação/deleção passam pelo backend
-- Soft delete de aplicações (campo `deletedAt`)
+- Autenticação via Supabase Auth (JWT gerenciado pelo Supabase)
+- Row Level Security (RLS) habilitado em todas as tabelas
+- Edge Functions com verificação manual de JWT e role de admin (`verifyJWT: false` nas funções admin para evitar conflito de verificação dupla)
+- API keys de CloudAMQP e MongoDB Atlas nunca expostas no frontend
+- Todas as operações sensíveis passam pelas Edge Functions com `SUPABASE_SERVICE_ROLE_KEY`
 
 ## Regras de Negócio
 
-- **Rate limit**: usuário pode criar no máximo 1 aplicação a cada 24 horas
-- A restrição de 24h persiste mesmo após deletar a aplicação (`user_limits` não é apagado)
+- **Rate limit**: cooldown configurável por tipo de aplicação na tabela `user_limits`
+- A restrição de cooldown persiste mesmo após deletar a aplicação
+- Usuários com role `admin` têm acesso ao painel administrativo completo
+- Soft delete de aplicações (campo `deleted_at`)
+
+## Ícones de Serviços
+
+- RabbitMQ: `/public/RabbitMQ.svg`
+- LavinMQ: `/public/LavinMQ.svg`
+- MongoDB: `/public/mongodb.svg`
 
 ## Design
 
-### Paleta de Cores (Dark Mode)
-- Background principal: `#020617` (slate-950)
-- Background secundário: `#0f172a` (slate-900)
-- Cards/inputs: `#1e293b` (slate-800)
-- Bordas: `#334155` (slate-700)
-- Texto principal: `#f1f5f9` (slate-100)
-- Texto secundário: `#94a3b8` (slate-400)
-- Primária: `#3b82f6` (blue-500)
-- RabbitMQ: `#f97316` (orange-500)
-- LavinMQ: `#06b6d4` (cyan-500)
+### Paleta de Cores
+- Suporte completo a dark mode e light mode via variáveis CSS
+- Cores de destaque por tipo: RabbitMQ (`#f97316`), LavinMQ (`#06b6d4`), MongoDB (`#22c55e`)
+- Cor primária: `#3b82f6` (blue-500)
 
 ## Variáveis de Ambiente
 
 | Variável | Onde | Descrição |
 |---|---|---|
-| `app_MONGODB_URI` | Vercel (backend) | String de conexão MongoDB |
-| `CLOUDAMQP_API_KEY` | Vercel (backend) | Chave da API CloudAMQP |
-| `JWT_SECRET` | Vercel (backend) | Segredo para assinar tokens JWT |
-
-> Nenhuma variável de ambiente é exposta no frontend.
+| `VITE_SUPABASE_URL` | Frontend | URL do projeto Supabase |
+| `VITE_SUPABASE_ANON_KEY` | Frontend | Chave anon pública do Supabase |
+| `SUPABASE_SERVICE_ROLE_KEY` | Edge Functions (auto) | Chave de serviço do Supabase |
+| `CLOUDAMQP_API_KEY` | Edge Functions | Chave da API CloudAMQP |
+| `MONGODB_*` | Edge Functions | Credenciais da API MongoDB Atlas |
 
 ## Desenvolvimento Local
 
 ### Pré-requisitos
 - Node.js 18+
-- MongoDB (local ou Atlas)
-- Vercel CLI (`npm i -g vercel`)
+- Projeto Supabase configurado
 
 ### Comandos
 ```bash
 npm install
-
-vercel dev
+npm run dev
 ```
-
-> O `vercel dev` executa tanto o frontend (Vite) quanto as Functions localmente.
 
 ### Build de Produção
 ```bash
 npm run build
 ```
-
-## Integração CloudAMQP
-
-Sem `CLOUDAMQP_API_KEY` configurada, o sistema retorna instâncias mock para desenvolvimento (credenciais fictícias). Com a chave configurada na Vercel, as instâncias são criadas na plataforma CloudAMQP real.
-
-## Roadmap (Módulos Futuros)
-
-- [ ] **Cursos** - Catálogo de cursos DevOps
-- [ ] **Monitor SSL** - Monitoramento de certificados SSL
-- [ ] **Vulnerabilidades** - Scan de vulnerabilidades de sites
-- [ ] **Blacklist IP** - Verificação de IPs em listas negras
-- [ ] **Observabilidade** - Métricas e dashboards
