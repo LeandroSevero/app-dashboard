@@ -43,14 +43,39 @@ export async function createApplication(
   type: string
 ): Promise<{ application?: Application; error?: string; next_allowed_at?: string }> {
   try {
-    const { data, error } = await supabase.functions.invoke("create-application", {
-      body: { name, type },
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+
+    const res = await fetch(`${supabaseUrl}/functions/v1/create-application`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": token ? `Bearer ${token}` : `Bearer ${anonKey}`,
+        "Apikey": anonKey,
+      },
+      body: JSON.stringify({ name, type }),
     });
 
-    if (error) return { error: error.message };
-    if (data?.error) return { error: data.message || data.error, next_allowed_at: data.next_allowed_at };
+    let data: Record<string, unknown> = {};
+    try {
+      data = await res.json();
+    } catch {
+      return { error: `Erro HTTP ${res.status}` };
+    }
 
-    return { application: data.application };
+    if (!res.ok) {
+      const msg = (data?.error as string) || (data?.message as string) || `Erro HTTP ${res.status}`;
+      return { error: msg, next_allowed_at: data?.next_allowed_at as string | undefined };
+    }
+
+    if (data?.error) {
+      return { error: (data.message as string) || (data.error as string), next_allowed_at: data?.next_allowed_at as string | undefined };
+    }
+
+    return { application: data.application as Application };
   } catch {
     return { error: "Erro de conexão. Tente novamente." };
   }

@@ -8,71 +8,138 @@ const corsHeaders = {
 };
 
 const CLOUDAMQP_API_KEY = Deno.env.get("CLOUDAMQP_API_KEY") || "";
-const CLOUDAMQP_API_URL = "https://customer.cloudamqp.com/api";
+const CLOUDAMQP_BASE_URL = "https://customer.cloudamqp.com/api";
 
 const PLAN_MAP: Record<string, string> = {
   rabbitmq: "lemur",
   lavinmq: "lemming",
 };
 
-async function cloudamqpRequest(path: string, method: string, body?: unknown) {
-  const credentials = btoa(`${CLOUDAMQP_API_KEY}:`);
-  const res = await fetch(`${CLOUDAMQP_API_URL}${path}`, {
-    method,
+function parseAmqpUrl(url: string): { username: string; password: string; hostname: string; vhost: string } {
+  try {
+    const parsed = new URL(url);
+    return {
+      username: decodeURIComponent(parsed.username),
+      password: decodeURIComponent(parsed.password),
+      hostname: parsed.hostname,
+      vhost: decodeURIComponent(parsed.pathname.replace(/^\//, "")),
+    };
+  } catch {
+    return { username: "", password: "", hostname: "", vhost: "" };
+  }
+}
+
+async function cloudamqpGet(path: string) {
+  const credentials = btoa(`:${CLOUDAMQP_API_KEY}`);
+  const res = await fetch(`${CLOUDAMQP_BASE_URL}${path}`, {
+    method: "GET",
     headers: {
       Authorization: `Basic ${credentials}`,
       "Content-Type": "application/json",
     },
-    body: body ? JSON.stringify(body) : undefined,
   });
-
-  const responseText = await res.text();
-  console.log(`[cloudamqp] ${method} ${path} -> status=${res.status} body=${responseText}`);
-
-  if (!res.ok) {
-    throw new Error(`CloudAMQP ${res.status}: ${responseText}`);
-  }
-
-  if (res.status === 204 || !responseText) return null;
-
-  try {
-    return JSON.parse(responseText);
-  } catch {
-    return responseText;
-  }
+  const text = await res.text();
+  console.log(`[cloudamqp] GET ${path} -> status=${res.status} body=${text}`);
+  if (!res.ok) throw new Error(`CloudAMQP GET ${path} ${res.status}: ${text}`);
+  return JSON.parse(text);
 }
 
-async function createCloudamqpInstance(name: string, type: string) {
-  const normalizedType = type.toLowerCase();
+async function cloudamqpPost(path: string, body: unknown) {
+  const credentials = btoa(`:${CLOUDAMQP_API_KEY}`);
+  const bodyJson = JSON.stringify(body);
+  console.log(`[cloudamqp] POST ${path} payload=${bodyJson}`);
+  const res = await fetch(`${CLOUDAMQP_BASE_URL}${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${credentials}`,
+      "Content-Type": "application/json",
+    },
+    body: bodyJson,
+  });
+  const text = await res.text();
+  console.log(`[cloudamqp] POST ${path} -> status=${res.status} body=${text}`);
+  if (!res.ok) throw new Error(`CloudAMQP POST ${path} ${res.status}: ${text}`);
+  if (!text) return null;
+  return JSON.parse(text);
+}
 
-  console.log(`[create-application] Creating instance: name=${name} type=${normalizedType}`);
+interface InstanceDetails {
+  amqpUrl: string;
+  username: string;
+  password: string;
+  hostname: string;
+  vhost: string;
+  managementUrl: string;
+  mqttHostname: string;
+  mqttPort: number;
+  mqttTlsPort: number;
+  cloudamqpId: string;
+  apikey: string;
+}
+
+async function createAndFetchInstance(name: string, type: string): Promise<InstanceDetails> {
+  const normalizedType = type.toLowerCase();
+  const plan = PLAN_MAP[normalizedType];
+  if (!plan) throw new Error(`Tipo inválido: "${type}". Use rabbitmq ou lavinmq`);
 
   if (!CLOUDAMQP_API_KEY) {
-    console.log("[create-application] No API key, returning mock instance");
     const mockId = Math.random().toString(36).substring(2, 10);
+    const mockPass = Math.random().toString(36).substring(2, 18);
+    const mockHost = `${mockId}.cloudamqp.com`;
     return {
-      id: mockId,
-      url: `amqps://mock_${mockId}:mock_pass_${mockId}@bunny.cloudamqp.com/${mockId}`,
-      login: `mock_${mockId}`,
-      password: `mock_pass_${mockId}`,
-      management_url: `https://customer.cloudamqp.com/instance/${mockId}`,
+      amqpUrl: `amqps://${mockId}:${mockPass}@${mockHost}/${mockId}`,
+      username: mockId,
+      password: mockPass,
+      hostname: mockHost,
+      vhost: mockId,
+      managementUrl: `https://customer.cloudamqp.com/instance/mock_${mockId}`,
+      mqttHostname: mockHost,
+      mqttPort: 1883,
+      mqttTlsPort: 8883,
+      cloudamqpId: `mock_${mockId}`,
+      apikey: `mock_apikey_${mockId}`,
     };
   }
 
-  const plan = PLAN_MAP[normalizedType];
-  if (!plan) {
-    throw new Error(`Tipo de instância inválido: "${type}". Tipos suportados: rabbitmq, lavinmq`);
-  }
-
-  const payload = {
+  const created = await cloudamqpPost("/instances", {
     name,
     plan,
     region: "amazon-web-services::us-east-1",
+  });
+
+  const instanceId = String(created.id);
+  const amqpUrl: string = created.url || "";
+
+  const { username, password, hostname, vhost } = parseAmqpUrl(amqpUrl);
+
+  let mqttHostname = hostname;
+  let managementUrl = `https://customer.cloudamqp.com/instance/${instanceId}`;
+
+  try {
+    const details = await cloudamqpGet(`/instances/${instanceId}`);
+    if (details?.urls?.hostname_external) {
+      mqttHostname = details.urls.hostname_external;
+    }
+    if (details?.management_url) {
+      managementUrl = details.management_url;
+    }
+  } catch (e) {
+    console.log(`[cloudamqp] Could not fetch instance details: ${e}`);
+  }
+
+  return {
+    amqpUrl,
+    username,
+    password,
+    hostname,
+    vhost,
+    managementUrl,
+    mqttHostname,
+    mqttPort: 1883,
+    mqttTlsPort: 8883,
+    cloudamqpId: instanceId,
+    apikey: created.apikey || "",
   };
-
-  console.log(`[create-application] CloudAMQP payload: ${JSON.stringify(payload)}`);
-
-  return cloudamqpRequest("/instances", "POST", payload);
 }
 
 Deno.serve(async (req: Request) => {
@@ -82,10 +149,10 @@ Deno.serve(async (req: Request) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
-    console.log("[create-application] Authorization header present:", !!authHeader);
+    console.log("[create-application] Authorization present:", !!authHeader);
 
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Não autorizado", debug: "missing_auth_header" }), {
+      return new Response(JSON.stringify({ error: "Não autorizado" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -103,22 +170,30 @@ Deno.serve(async (req: Request) => {
     );
 
     const { data: { user }, error: authError } = await userClient.auth.getUser();
-    console.log("[create-application] getUser result:", { userId: user?.id, error: authError?.message });
+    console.log("[create-application] user:", user?.id, "authError:", authError?.message);
 
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Não autorizado", debug: authError?.message || "no_user" }), {
+      return new Response(JSON.stringify({ error: "Não autorizado", detail: authError?.message }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const body = await req.json();
-    const { name, type } = body;
+    let body: { name?: string; type?: string };
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: "Payload inválido" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
+    const { name, type } = body;
     console.log(`[create-application] Received: name=${name} type=${type}`);
 
     if (!name || !type) {
-      return new Response(JSON.stringify({ error: "Nome e tipo são obrigatórios" }), {
+      return new Response(JSON.stringify({ error: "name e type são obrigatórios" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -127,7 +202,7 @@ Deno.serve(async (req: Request) => {
     const normalizedType = type.toLowerCase();
     if (!["rabbitmq", "lavinmq"].includes(normalizedType)) {
       return new Response(
-        JSON.stringify({ error: `Tipo inválido: "${type}". Use "rabbitmq" ou "lavinmq"` }),
+        JSON.stringify({ error: `Tipo inválido: "${type}". Use rabbitmq ou lavinmq` }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -151,11 +226,10 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const instance = await createCloudamqpInstance(name, normalizedType);
-    const managementUrl = instance.management_url || `https://customer.cloudamqp.com/instance/${instance.id}`;
-    const now = new Date().toISOString();
+    const instance = await createAndFetchInstance(name, normalizedType);
+    console.log(`[create-application] Instance ready: id=${instance.cloudamqpId} host=${instance.hostname}`);
 
-    console.log(`[create-application] Instance created: id=${instance.id}`);
+    const now = new Date().toISOString();
 
     const { data: app, error: insertError } = await supabase
       .from("applications")
@@ -163,19 +237,24 @@ Deno.serve(async (req: Request) => {
         user_id: user.id,
         name,
         type: normalizedType,
-        cloudamqp_id: String(instance.id),
-        amqp_url: instance.url,
-        amqp_user: instance.login,
+        cloudamqp_id: instance.cloudamqpId,
+        amqp_url: instance.amqpUrl,
+        amqp_user: instance.username,
         amqp_password: instance.password,
-        panel_url: managementUrl,
+        panel_url: instance.managementUrl,
+        mqtt_host: instance.mqttHostname,
+        mqtt_port: instance.mqttPort,
+        mqtt_tls_port: instance.mqttTlsPort,
+        mqtt_user: instance.username,
+        mqtt_password: instance.password,
         created_at: now,
       })
       .select()
       .single();
 
     if (insertError) {
-      console.log("[create-application] Insert error:", insertError.message);
-      throw insertError;
+      console.log("[create-application] DB insert error:", insertError.message);
+      throw new Error(`Erro ao salvar aplicação: ${insertError.message}`);
     }
 
     await supabase
@@ -194,6 +273,11 @@ Deno.serve(async (req: Request) => {
           password: app.amqp_password,
           cloudamqp_id: app.cloudamqp_id,
           panel_url: app.panel_url,
+          mqtt_hostname: app.mqtt_host,
+          mqtt_port: app.mqtt_port,
+          mqtt_port_tls: app.mqtt_tls_port,
+          mqtt_username: app.mqtt_user,
+          mqtt_password: app.mqtt_password,
           created_at: app.created_at,
         },
       }),
@@ -201,7 +285,7 @@ Deno.serve(async (req: Request) => {
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erro interno do servidor";
-    console.log("[create-application] Error:", message);
+    console.log("[create-application] Unhandled error:", message);
     return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
