@@ -1,4 +1,4 @@
-import { supabase, invokeWithAuth } from "../lib/supabase";
+import { supabase, invokeWithAuth, getValidToken } from "../lib/supabase";
 import type { ApiResponse } from "../types/api";
 import type { Application } from "../types/database";
 import { logEvent } from "./logService";
@@ -46,8 +46,7 @@ export async function createApplication(
   type: string
 ): Promise<ApiResponse<Application> & { next_allowed_at?: string }> {
   try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData.session?.access_token;
+    const token = await getValidToken();
 
     if (!token) return { success: false, error: "Usuário não autenticado" };
 

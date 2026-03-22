@@ -7,12 +7,20 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 (window as any).supabase = supabase;
 
+export async function getValidToken(): Promise<string | null> {
+  const { data, error } = await supabase.auth.refreshSession();
+  if (!error && data.session?.access_token) {
+    return data.session.access_token;
+  }
+  const { data: sessionData } = await supabase.auth.getSession();
+  return sessionData.session?.access_token ?? null;
+}
+
 export async function invokeWithAuth<T = unknown>(
   functionName: string,
   body?: Record<string, unknown>
 ): Promise<{ data: T | null; error: Error | null }> {
-  const { data: sessionData } = await supabase.auth.getSession();
-  const token = sessionData.session?.access_token;
+  const token = await getValidToken();
 
   if (!token) {
     return { data: null, error: new Error("Usuário não autenticado") };
