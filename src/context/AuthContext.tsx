@@ -1,10 +1,16 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import type { User, Session } from "@supabase/supabase-js";
+import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 
+interface AuthUser {
+  id: string;
+  email: string;
+  role: "admin" | "user";
+}
+
 interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
   session: Session | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
@@ -15,38 +21,66 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+
+  async function loadProfile(supabaseUser: User): Promise<AuthUser> {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", supabaseUser.id)
+      .maybeSingle();
+
+    return {
+      id: supabaseUser.id,
+      email: supabaseUser.email || "",
+      role: (profile?.role as "admin" | "user") || "user",
+    };
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
+      if (session?.user) {
+        (async () => {
+          const authUser = await loadProfile(session.user);
+          setUser(authUser);
+          setLoading(false);
+        })();
+      } else {
+        setLoading(false);
+      }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
-      setUser(session?.user ?? null);
+      if (session?.user) {
+        (async () => {
+          const authUser = await loadProfile(session.user);
+          setUser(authUser);
+        })();
+      } else {
+        setUser(null);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  async function signIn(email: string, password: string) {
+  async function signIn(email: string, password: string): Promise<{ error: string | null }> {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { error: error.message };
     return { error: null };
   }
 
-  async function signUp(email: string, password: string) {
+  async function signUp(email: string, password: string): Promise<{ error: string | null }> {
     const { error } = await supabase.auth.signUp({ email, password });
     if (error) return { error: error.message };
     return { error: null };
   }
 
-  async function signOut() {
+  async function signOut(): Promise<void> {
     await supabase.auth.signOut();
   }
 
