@@ -1,10 +1,7 @@
-import { supabase } from "../lib/supabase";
+import { supabase, invokeWithAuth } from "../lib/supabase";
 import type { ApiResponse } from "../types/api";
 import type { Application } from "../types/database";
 import { logEvent } from "./logService";
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 function mapRow(row: Record<string, unknown>): Application {
   return {
@@ -49,10 +46,13 @@ export async function createApplication(
   type: string
 ): Promise<ApiResponse<Application> & { next_allowed_at?: string }> {
   try {
-    const { data: { session } } = await supabase.auth.refreshSession();
-    const token = session?.access_token;
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
 
-    if (!token) return { success: false, error: "Sessão expirada. Faça login novamente." };
+    if (!token) return { success: false, error: "Usuário não autenticado" };
+
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+    const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
     const res = await fetch(`${SUPABASE_URL}/functions/v1/create-application`, {
       method: "POST",
@@ -87,12 +87,10 @@ export async function createApplication(
 
 export async function removeApplication(id: string): Promise<ApiResponse> {
   try {
-    const { data, error } = await supabase.functions.invoke("delete-application", {
-      body: { id },
-    });
+    const { data, error } = await invokeWithAuth("delete-application", { id });
 
     if (error) return { success: false, error: error.message };
-    if (data?.error) return { success: false, error: data.error };
+    if ((data as Record<string, unknown>)?.error) return { success: false, error: (data as Record<string, unknown>).error as string };
 
     logEvent("delete", id, {});
     return { success: true };

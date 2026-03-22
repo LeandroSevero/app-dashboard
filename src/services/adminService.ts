@@ -1,3 +1,4 @@
+import { invokeWithAuth } from "../lib/supabase";
 import { supabase } from "../lib/supabase";
 import type { ApiResponse } from "../types/api";
 import type { AdminUser } from "../types/database";
@@ -5,10 +6,10 @@ import { logEvent } from "./logService";
 
 export async function fetchAllUsers(): Promise<ApiResponse<AdminUser[]>> {
   try {
-    const { data, error } = await supabase.functions.invoke("admin-users");
+    const { data, error } = await invokeWithAuth("admin-users");
     if (error) return { success: false, error: error.message };
-    if (data?.error) return { success: false, error: data.error };
-    return { success: true, data: data.users || [] };
+    if ((data as Record<string, unknown>)?.error) return { success: false, error: (data as Record<string, unknown>).error as string };
+    return { success: true, data: (data as Record<string, unknown>)?.users as AdminUser[] || [] };
   } catch {
     return { success: false, error: "Erro de conexão" };
   }
@@ -19,11 +20,9 @@ export async function updateUser(
   updates: { newPassword?: string; newEmail?: string; full_name?: string; phone?: string; bio?: string; avatar_url?: string }
 ): Promise<ApiResponse> {
   try {
-    const { data, error } = await supabase.functions.invoke("admin-update-user", {
-      body: { userId, ...updates },
-    });
+    const { data, error } = await invokeWithAuth("admin-update-user", { userId, ...updates });
     if (error) return { success: false, error: error.message };
-    if (data?.error) return { success: false, error: data.error };
+    if ((data as Record<string, unknown>)?.error) return { success: false, error: (data as Record<string, unknown>).error as string };
     return { success: true };
   } catch {
     return { success: false, error: "Erro de conexão" };
@@ -46,11 +45,9 @@ export async function deleteUser(userId: string): Promise<ApiResponse> {
 
 export async function updateApplication(appId: string, newName: string): Promise<ApiResponse> {
   try {
-    const { data, error } = await supabase.functions.invoke("admin-update-application", {
-      body: { appId, newName },
-    });
+    const { data, error } = await invokeWithAuth("admin-update-application", { appId, newName });
     if (error) return { success: false, error: error.message };
-    if (data?.error) return { success: false, error: data.error };
+    if ((data as Record<string, unknown>)?.error) return { success: false, error: (data as Record<string, unknown>).error as string };
 
     logEvent("update", appId, { newName });
     return { success: true };
@@ -61,11 +58,9 @@ export async function updateApplication(appId: string, newName: string): Promise
 
 export async function deleteApplication(appId: string): Promise<ApiResponse> {
   try {
-    const { data, error } = await supabase.functions.invoke("delete-application", {
-      body: { id: appId },
-    });
+    const { data, error } = await invokeWithAuth("delete-application", { id: appId });
     if (error) return { success: false, error: error.message };
-    if (data?.error) return { success: false, error: data.error };
+    if ((data as Record<string, unknown>)?.error) return { success: false, error: (data as Record<string, unknown>).error as string };
 
     logEvent("delete", appId, { admin: true });
     return { success: true };
@@ -78,14 +73,13 @@ export async function rotatePassword(
   appId: string
 ): Promise<ApiResponse<{ new_password: string; new_url: string }>> {
   try {
-    const { data, error } = await supabase.functions.invoke("rotate-password", {
-      body: { appId },
-    });
+    const { data, error } = await invokeWithAuth("rotate-password", { appId });
     if (error) return { success: false, error: error.message };
-    if (data?.error) return { success: false, error: data.error };
+    if ((data as Record<string, unknown>)?.error) return { success: false, error: (data as Record<string, unknown>).error as string };
 
+    const d = data as Record<string, unknown>;
     logEvent("rotate_password", appId, {});
-    return { success: true, data: { new_password: data.new_password, new_url: data.new_url } };
+    return { success: true, data: { new_password: d.new_password as string, new_url: d.new_url as string } };
   } catch {
     return { success: false, error: "Erro de conexão" };
   }
