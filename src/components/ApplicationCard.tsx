@@ -6,7 +6,6 @@ import {
   ExternalLink,
   Trash2,
   CheckCheck,
-  Server,
   Zap,
   ChevronDown,
   ChevronUp,
@@ -69,7 +68,7 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
               {app.type === "lavinmq" ? (
                 <Zap className="w-4 h-4 text-cyan-400" />
               ) : (
-                <Server className="w-4 h-4 text-orange-400" />
+                <img src="/RabbitMQ.svg" alt="RabbitMQ" className="w-5 h-5" />
               )}
             </div>
             <div>

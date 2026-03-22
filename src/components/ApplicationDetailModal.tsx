@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   X,
-  Server,
   Zap,
   RefreshCw,
   Users,
@@ -178,7 +177,7 @@ export default function ApplicationDetailModal({ app, onClose }: ApplicationDeta
             >
               {isLavinMQ
                 ? <Zap className="w-4 h-4 text-cyan-400" />
-                : <Server className="w-4 h-4 text-orange-400" />}
+                : <img src="/RabbitMQ.svg" alt="RabbitMQ" className="w-5 h-5" />}
             </div>
             <div>
               <h2 className="font-semibold text-sm" style={{ color: "var(--color-fg)" }}>{app.name}</h2>
