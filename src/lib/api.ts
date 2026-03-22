@@ -7,6 +7,9 @@ import type { Application, AdminUser, UserProfile } from "../types/database";
 
 export async function listApplications(): Promise<{ applications: Application[]; error?: string }> {
   try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return { applications: [], error: "Sessão não encontrada. Faça login novamente." };
+
     const { data, error } = await supabase
       .from("applications")
       .select("*")

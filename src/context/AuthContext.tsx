@@ -59,9 +59,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         (async () => {
           const authUser = await loadProfile(session.user);
           setUser(authUser);
+          setLoading(false);
         })();
       } else {
         setUser(null);
+        setLoading(false);
       }
     });
 

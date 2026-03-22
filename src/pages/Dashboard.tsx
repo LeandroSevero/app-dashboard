@@ -7,6 +7,7 @@ import {
   Package,
   Activity,
   User,
+  AlertCircle,
 } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Header from "../components/Header";
@@ -15,13 +16,16 @@ import CreateApplicationModal from "../components/CreateApplicationModal";
 import UserProfile, { calcCompletion } from "../components/UserProfile";
 import ProfileIncompletePopup from "../components/ProfileIncompletePopup";
 import { listApplications, createApplication, deleteApplication } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 import type { Application, UserProfile as UserProfileType } from "../types/database";
 
 export default function Dashboard() {
+  const { session } = useAuth();
   const [activeSection, setActiveSection] = useState("applications");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [applications, setApplications] = useState<Application[]>([]);
   const [loadingApps, setLoadingApps] = useState(true);
+  const [appsError, setAppsError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
@@ -31,14 +35,18 @@ export default function Dashboard() {
 
   const fetchApplications = useCallback(async () => {
     setLoadingApps(true);
-    const { applications } = await listApplications();
+    setAppsError(null);
+    const { applications, error } = await listApplications();
     setApplications(applications);
+    if (error) setAppsError(error);
     setLoadingApps(false);
   }, []);
 
   useEffect(() => {
-    fetchApplications();
-  }, [fetchApplications]);
+    if (session) {
+      fetchApplications();
+    }
+  }, [session, fetchApplications]);
 
   function handleProfileLoaded(profile: UserProfileType) {
     const pct = calcCompletion(profile);
@@ -100,6 +108,7 @@ export default function Dashboard() {
             <ApplicationsSection
               applications={applications}
               loading={loadingApps}
+              error={appsError}
               deletingId={deletingId}
               onDelete={handleDelete}
               onRefresh={fetchApplications}
@@ -206,6 +215,7 @@ function StatCard({
 interface ApplicationsSectionProps {
   applications: Application[];
   loading: boolean;
+  error: string | null;
   deletingId: string | null;
   onDelete: (id: string) => void;
   onRefresh: () => void;
@@ -215,6 +225,7 @@ interface ApplicationsSectionProps {
 function ApplicationsSection({
   applications,
   loading,
+  error,
   deletingId,
   onDelete,
   onRefresh,
@@ -247,6 +258,23 @@ function ApplicationsSection({
         </div>
       </div>
 
+      {error && (
+        <div
+          className="flex items-center gap-3 rounded-xl px-4 py-3"
+          style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}
+        >
+          <AlertCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#ef4444' }} />
+          <p className="text-sm" style={{ color: '#ef4444' }}>{error}</p>
+          <button
+            onClick={onRefresh}
+            className="ml-auto text-xs font-medium underline underline-offset-2"
+            style={{ color: '#ef4444' }}
+          >
+            Tentar novamente
+          </button>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <div className="flex flex-col items-center gap-3">
@@ -254,7 +282,7 @@ function ApplicationsSection({
             <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>Carregando aplicações...</p>
           </div>
         </div>
-      ) : applications.length === 0 ? (
+      ) : applications.length === 0 && !error ? (
         <EmptyState onOpenCreate={onOpenCreate} />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
