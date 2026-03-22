@@ -196,6 +196,7 @@ Deno.serve(async (req: Request) => {
       .from("user_limits")
       .select("last_created_at")
       .eq("user_id", user.id)
+      .eq("app_type", normalizedType)
       .maybeSingle();
 
     if (limitData?.last_created_at && limitData.last_created_at > twentyFourHoursAgo) {
@@ -203,7 +204,7 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({
         success: false,
         error: "Limite de criação atingido",
-        message: "Você só pode criar 1 aplicação a cada 24 horas.",
+        message: `Você só pode criar 1 ${normalizedType === "rabbitmq" ? "RabbitMQ" : "LavinMQ"} a cada 24 horas.`,
         next_allowed_at: nextAllowed.toISOString(),
       }, 429);
     }
@@ -237,7 +238,7 @@ Deno.serve(async (req: Request) => {
 
     await supabase
       .from("user_limits")
-      .upsert({ user_id: user.id, last_created_at: now }, { onConflict: "user_id" });
+      .upsert({ user_id: user.id, app_type: normalizedType, last_created_at: now }, { onConflict: "user_id,app_type" });
 
     await supabase.from("app_events").insert({
       user_id: user.id,
