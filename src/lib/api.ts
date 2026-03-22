@@ -82,3 +82,15 @@ export async function adminRotatePassword(
   const res = await adminSvc.rotatePassword(appId);
   return { success: res.success, new_password: res.data?.new_password, new_url: res.data?.new_url, error: res.error };
 }
+
+export async function adminGetStats(): Promise<{ stats?: adminSvc.AdminStats; error?: string }> {
+  const res = await adminSvc.fetchAdminStats();
+  return { stats: res.data, error: res.error };
+}
+
+export async function adminGetLogs(
+  options?: { limit?: number; event_type?: string }
+): Promise<{ logs?: adminSvc.AdminLog[]; error?: string }> {
+  const res = await adminSvc.fetchAdminLogs(options);
+  return { logs: res.data, error: res.error };
+}

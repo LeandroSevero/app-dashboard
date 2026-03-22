@@ -8,6 +8,7 @@ import {
   Activity,
   User,
   AlertCircle,
+  Database,
 } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Header from "../components/Header";
@@ -22,7 +23,7 @@ import type { Application, UserProfile as UserProfileType } from "../types/datab
 
 export default function Dashboard() {
   const { session } = useAuth();
-  const [activeSection, setActiveSection] = useState("applications");
+  const [activeSection, setActiveSection] = useState("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [applications, setApplications] = useState<Application[]>([]);
   const [loadingApps, setLoadingApps] = useState(true);
@@ -155,6 +156,7 @@ function DashboardHome({ apps }: { apps: Application[] }) {
   const total = apps.length;
   const rabbitmq = apps.filter((a) => a.type === "rabbitmq").length;
   const lavinmq = apps.filter((a) => a.type === "lavinmq").length;
+  const mongodb = apps.filter((a) => a.type === "mongodb").length;
 
   return (
     <div className="space-y-6">
@@ -163,10 +165,11 @@ function DashboardHome({ apps }: { apps: Application[] }) {
         <p className="text-sm mt-1" style={{ color: 'var(--color-fg-muted)' }}>Bem-vindo ao seu painel DevOps.</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <StatCard icon={<Package className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />} label="Total de aplicações" value={total} color="primary" />
         <StatCard icon={<img src="/RabbitMQ.svg" alt="RabbitMQ" className="w-5 h-5" />} label="RabbitMQ" value={rabbitmq} color="orange" />
         <StatCard icon={<img src="/LavinMQ.svg" alt="LavinMQ" className="w-5 h-5" />} label="LavinMQ" value={lavinmq} color="cyan" />
+        <StatCard icon={<Database className="w-5 h-5" style={{ color: '#22c55e' }} />} label="MongoDB" value={mongodb} color="green" />
       </div>
 
       <div
@@ -203,12 +206,14 @@ function StatCard({
   icon: React.ReactNode;
   label: string;
   value: number;
-  color: "primary" | "orange" | "cyan";
+  color: "primary" | "orange" | "cyan" | "green";
 }) {
   const borderStyle = color === "primary"
     ? { background: 'color-mix(in srgb, var(--color-primary) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 15%, transparent)' }
     : color === "orange"
     ? { background: 'rgba(249,115,22,0.05)', border: '1px solid rgba(249,115,22,0.1)' }
+    : color === "green"
+    ? { background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.1)' }
     : { background: 'rgba(6,182,212,0.05)', border: '1px solid rgba(6,182,212,0.1)' };
 
   return (
@@ -324,7 +329,7 @@ function EmptyState({ onOpenCreate }: { onOpenCreate: () => void }) {
       </div>
       <h3 className="font-semibold text-base mb-1" style={{ color: 'var(--color-fg)' }}>Nenhuma aplicação ainda</h3>
       <p className="text-sm max-w-xs mb-6" style={{ color: 'var(--color-fg-muted)' }}>
-        Crie sua primeira instância de mensageria RabbitMQ ou LavinMQ.
+        Crie sua primeira instância de mensageria RabbitMQ, LavinMQ ou MongoDB.
       </p>
       <button
         onClick={onOpenCreate}
