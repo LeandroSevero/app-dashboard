@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import type { Session, User } from "@supabase/supabase-js";
+import { supabase } from "../lib/supabase";
 
 interface AuthUser {
   id: string;
@@ -9,95 +11,81 @@ interface AuthUser {
 
 interface AuthContextType {
   user: AuthUser | null;
-  token: string | null;
+  session: Session | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string) => Promise<{ error: string | null }>;
-  signOut: () => void;
+  signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const TOKEN_KEY = "ls_dashboard_token";
-const USER_KEY = "ls_dashboard_user";
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
+  async function loadProfile(supabaseUser: User): Promise<AuthUser> {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", supabaseUser.id)
+      .maybeSingle();
+
+    return {
+      id: supabaseUser.id,
+      email: supabaseUser.email || "",
+      role: (profile?.role as "admin" | "user") || "user",
+    };
+  }
+
   useEffect(() => {
-    const storedToken = localStorage.getItem(TOKEN_KEY);
-    const storedUser = localStorage.getItem(USER_KEY);
-    if (storedToken && storedUser) {
-      try {
-        setToken(storedToken);
-        setUser(JSON.parse(storedUser));
-      } catch {
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(USER_KEY);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session?.user) {
+        (async () => {
+          const authUser = await loadProfile(session.user);
+          setUser(authUser);
+          setLoading(false);
+        })();
+      } else {
+        setLoading(false);
       }
-    }
-    setLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session);
+      if (session?.user) {
+        (async () => {
+          const authUser = await loadProfile(session.user);
+          setUser(authUser);
+        })();
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   async function signIn(email: string, password: string): Promise<{ error: string | null }> {
-    try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        return { error: data.error || "Erro ao fazer login" };
-      }
-
-      localStorage.setItem(TOKEN_KEY, data.token);
-      localStorage.setItem(USER_KEY, JSON.stringify(data.user));
-      setToken(data.token);
-      setUser(data.user);
-      return { error: null };
-    } catch {
-      return { error: "Erro de conexão. Verifique sua internet." };
-    }
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { error: error.message };
+    return { error: null };
   }
 
   async function signUp(email: string, password: string): Promise<{ error: string | null }> {
-    try {
-      const res = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        return { error: data.error || "Erro ao criar conta" };
-      }
-
-      localStorage.setItem(TOKEN_KEY, data.token);
-      localStorage.setItem(USER_KEY, JSON.stringify(data.user));
-      setToken(data.token);
-      setUser(data.user);
-      return { error: null };
-    } catch {
-      return { error: "Erro de conexão. Verifique sua internet." };
-    }
+    const { error } = await supabase.auth.signUp({ email, password });
+    if (error) return { error: error.message };
+    return { error: null };
   }
 
-  function signOut() {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
-    setToken(null);
-    setUser(null);
+  async function signOut(): Promise<void> {
+    await supabase.auth.signOut();
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

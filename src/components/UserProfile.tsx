@@ -82,10 +82,6 @@ export default function UserProfile({ onProfileLoaded }: UserProfileProps) {
     if (result.error) {
       setError(result.error);
     } else {
-      if (result.token) {
-        localStorage.setItem("ls_dashboard_token", result.token);
-        if (result.user) localStorage.setItem("ls_dashboard_user", JSON.stringify(result.user));
-      }
       const updated: UserProfileType = {
         id: profile!.id,
         email: result.profile?.email || newEmail,
