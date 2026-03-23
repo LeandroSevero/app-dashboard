@@ -1,25 +1,34 @@
 import { useState } from "react";
-import { X, Loader2, Plus, Clock } from "lucide-react";
+import { X, Loader2, Plus, Clock, Timer } from "lucide-react";
 
 interface CreateApplicationModalProps {
   onClose: () => void;
-  onCreate: (name: string, type: string) => Promise<{ error?: string; next_allowed_at?: string }>;
+  onCreate: (name: string, type: string, ttlHours: number | null) => Promise<{ error?: string; next_allowed_at?: string }>;
 }
 
-type AppType = "rabbitmq" | "lavinmq";
+type AppType = "rabbitmq" | "lavinmq" | "mongodb";
 
 interface TypeLimit {
   blocked: boolean;
   next_allowed_at: string | null;
 }
 
+const TTL_OPTIONS = [
+  { value: 6, label: "6 horas" },
+  { value: 12, label: "12 horas" },
+  { value: 18, label: "18 horas" },
+  { value: 24, label: "24 horas" },
+];
+
 export default function CreateApplicationModal({ onClose, onCreate }: CreateApplicationModalProps) {
   const [name, setName] = useState("");
   const [type, setType] = useState<AppType>("rabbitmq");
+  const [ttlHours, setTtlHours] = useState<number>(6);
   const [loading, setLoading] = useState(false);
   const [limits, setLimits] = useState<Record<AppType, TypeLimit>>({
     rabbitmq: { blocked: false, next_allowed_at: null },
     lavinmq: { blocked: false, next_allowed_at: null },
+    mongodb: { blocked: false, next_allowed_at: null },
   });
 
   const currentLimit = limits[type];
@@ -29,7 +38,7 @@ export default function CreateApplicationModal({ onClose, onCreate }: CreateAppl
     if (!name.trim() || currentLimit.blocked) return;
     setLoading(true);
 
-    const result = await onCreate(name.trim(), type);
+    const result = await onCreate(name.trim(), type, ttlHours);
 
     if (result.error) {
       setLimits((prev) => ({
@@ -54,28 +63,43 @@ export default function CreateApplicationModal({ onClose, onCreate }: CreateAppl
     });
   }
 
+  function typeLabel(t: AppType) {
+    if (t === "rabbitmq") return "RabbitMQ";
+    if (t === "lavinmq") return "LavinMQ";
+    return "MongoDB";
+  }
+
+  const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000);
+  const expiresLabel = expiresAt.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
   return (
     <div
       className="fixed inset-0 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.4)' }}
+      style={{ background: "rgba(0,0,0,0.4)" }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
         className="rounded-2xl w-full max-w-md shadow-2xl animate-in"
-        style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}
+        style={{ background: "var(--color-card)", border: "1px solid var(--color-border)" }}
       >
         <div
           className="flex items-center justify-between px-6 py-5"
-          style={{ borderBottom: '1px solid var(--color-border)' }}
+          style={{ borderBottom: "1px solid var(--color-border)" }}
         >
           <div>
-            <h2 className="font-semibold text-base" style={{ color: 'var(--color-fg)' }}>Nova Aplicação</h2>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--color-fg-muted)' }}>Crie uma nova instância de mensageria</p>
+            <h2 className="font-semibold text-base" style={{ color: "var(--color-fg)" }}>Nova Aplicação</h2>
+            <p className="text-xs mt-0.5" style={{ color: "var(--color-fg-muted)" }}>Crie uma nova instância</p>
           </div>
           <button
             onClick={onClose}
             className="p-1.5 rounded-lg transition-all"
-            style={{ color: 'var(--color-fg-muted)' }}
+            style={{ color: "var(--color-fg-muted)" }}
           >
             <X className="w-4 h-4" />
           </button>
@@ -83,7 +107,7 @@ export default function CreateApplicationModal({ onClose, onCreate }: CreateAppl
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-fg)' }}>
+            <label className="block text-sm font-medium mb-2" style={{ color: "var(--color-fg)" }}>
               Nome da aplicação
             </label>
             <input
@@ -95,18 +119,18 @@ export default function CreateApplicationModal({ onClose, onCreate }: CreateAppl
               maxLength={50}
               className="w-full rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-all"
               style={{
-                background: 'var(--color-bg-secondary)',
-                border: '1px solid var(--color-border)',
-                color: 'var(--color-fg)',
+                background: "var(--color-bg-secondary)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-fg)",
               }}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-fg)' }}>
+            <label className="block text-sm font-medium mb-2" style={{ color: "var(--color-fg)" }}>
               Tipo de instância
             </label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-2.5">
               <TypeOption
                 value="rabbitmq"
                 selected={type === "rabbitmq"}
@@ -127,15 +151,63 @@ export default function CreateApplicationModal({ onClose, onCreate }: CreateAppl
                 color="cyan"
                 blocked={limits.lavinmq.blocked}
               />
+              <TypeOption
+                value="mongodb"
+                selected={type === "mongodb"}
+                onSelect={() => setType("mongodb")}
+                icon={<img src="/mongodb.svg" alt="MongoDB" className="w-5 h-5" />}
+                label="MongoDB"
+                description="Banco de dados"
+                color="green"
+                blocked={limits.mongodb.blocked}
+              />
             </div>
           </div>
 
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: "var(--color-fg)" }}>
+              <span className="flex items-center gap-1.5">
+                <Timer className="w-3.5 h-3.5" style={{ color: "var(--color-fg-muted)" }} />
+                Tempo de vida (TTL)
+              </span>
+            </label>
+            <div className="grid grid-cols-4 gap-2">
+              {TTL_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setTtlHours(opt.value)}
+                  className="py-2.5 rounded-xl text-sm font-medium transition-all duration-150"
+                  style={
+                    ttlHours === opt.value
+                      ? {
+                          background: "color-mix(in srgb, var(--color-primary) 12%, transparent)",
+                          border: "1px solid color-mix(in srgb, var(--color-primary) 40%, transparent)",
+                          color: "var(--color-primary)",
+                        }
+                      : {
+                          background: "var(--color-bg-secondary)",
+                          border: "1px solid var(--color-border)",
+                          color: "var(--color-fg-muted)",
+                        }
+                  }
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs mt-2 flex items-center gap-1" style={{ color: "var(--color-fg-muted)" }}>
+              <Clock className="w-3 h-3 flex-shrink-0" />
+              Expira em: <span style={{ color: "var(--color-fg)" }}>{expiresLabel}</span>
+            </p>
+          </div>
+
           {currentLimit.blocked && currentLimit.next_allowed_at && (
-            <div className="rounded-xl px-4 py-3 space-y-1" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
-              <p className="text-sm font-medium" style={{ color: '#ef4444' }}>
-                Limite de criação atingido para {type === "rabbitmq" ? "RabbitMQ" : "LavinMQ"}
+            <div className="rounded-xl px-4 py-3 space-y-1" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
+              <p className="text-sm font-medium" style={{ color: "#ef4444" }}>
+                Limite de criação atingido para {typeLabel(type)}
               </p>
-              <div className="flex items-center gap-1.5 text-xs" style={{ color: 'rgba(239,68,68,0.7)' }}>
+              <div className="flex items-center gap-1.5 text-xs" style={{ color: "rgba(239,68,68,0.7)" }}>
                 <Clock className="w-3 h-3" />
                 <span>Disponível em: {formatNextAllowed(currentLimit.next_allowed_at)}</span>
               </div>
@@ -144,10 +216,10 @@ export default function CreateApplicationModal({ onClose, onCreate }: CreateAppl
 
           <div
             className="rounded-xl px-4 py-3"
-            style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}
+            style={{ background: "var(--color-bg-secondary)", border: "1px solid var(--color-border)" }}
           >
-            <p className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>
-              Limite: <span style={{ color: 'var(--color-fg)' }}>1 criação de cada tipo a cada 24 horas</span> por conta.
+            <p className="text-xs" style={{ color: "var(--color-fg-muted)" }}>
+              Limite: <span style={{ color: "var(--color-fg)" }}>1 criação de cada tipo a cada 24 horas</span> por conta.
             </p>
           </div>
 
@@ -156,7 +228,7 @@ export default function CreateApplicationModal({ onClose, onCreate }: CreateAppl
               type="button"
               onClick={onClose}
               className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all"
-              style={{ color: 'var(--color-fg-muted)', border: '1px solid var(--color-border)', background: 'transparent' }}
+              style={{ color: "var(--color-fg-muted)", border: "1px solid var(--color-border)", background: "transparent" }}
             >
               Cancelar
             </button>
@@ -164,7 +236,7 @@ export default function CreateApplicationModal({ onClose, onCreate }: CreateAppl
               type="submit"
               disabled={loading || !name.trim() || currentLimit.blocked}
               className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: 'var(--color-primary)', color: 'var(--color-primary-fg)' }}
+              style={{ background: "var(--color-primary)", color: "var(--color-primary-fg)" }}
             >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -187,16 +259,20 @@ interface TypeOptionProps {
   icon: React.ReactNode;
   label: string;
   description: string;
-  color: "orange" | "cyan";
+  color: "orange" | "cyan" | "green";
   blocked: boolean;
 }
 
 function TypeOption({ selected, onSelect, icon, label, description, color, blocked }: TypeOptionProps) {
+  const colorMap = {
+    orange: { border: "rgba(249,115,22,0.35)", bg: "rgba(249,115,22,0.05)" },
+    cyan: { border: "rgba(6,182,212,0.35)", bg: "rgba(6,182,212,0.05)" },
+    green: { border: "rgba(34,197,94,0.35)", bg: "rgba(34,197,94,0.05)" },
+  };
+
   const selectedStyle = selected
-    ? color === "orange"
-      ? { border: '1px solid rgba(249,115,22,0.35)', background: 'rgba(249,115,22,0.05)' }
-      : { border: '1px solid rgba(6,182,212,0.35)', background: 'rgba(6,182,212,0.05)' }
-    : { border: '1px solid var(--color-border)', background: 'var(--color-bg-secondary)' };
+    ? { border: `1px solid ${colorMap[color].border}`, background: colorMap[color].bg }
+    : { border: "1px solid var(--color-border)", background: "var(--color-bg-secondary)" };
 
   return (
     <button
@@ -206,12 +282,12 @@ function TypeOption({ selected, onSelect, icon, label, description, color, block
       style={selectedStyle}
     >
       <div className="mb-2">{icon}</div>
-      <p className="text-sm font-medium" style={{ color: 'var(--color-fg)' }}>{label}</p>
-      <p className="text-xs mt-0.5" style={{ color: 'var(--color-fg-muted)' }}>{description}</p>
+      <p className="text-sm font-medium" style={{ color: "var(--color-fg)" }}>{label}</p>
+      <p className="text-xs mt-0.5" style={{ color: "var(--color-fg-muted)" }}>{description}</p>
       {blocked && (
         <div
           className="absolute top-2 right-2 flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-md"
-          style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}
+          style={{ background: "rgba(239,68,68,0.12)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.2)" }}
         >
           <Clock className="w-2.5 h-2.5" />
           Limite

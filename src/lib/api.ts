@@ -14,9 +14,10 @@ export async function listApplications(): Promise<{ applications: Application[];
 
 export async function createApplication(
   name: string,
-  type: string
+  type: string,
+  ttlHours: number | null = null
 ): Promise<{ application?: Application; error?: string; next_allowed_at?: string }> {
-  const res = await appSvc.createApplication(name, type);
+  const res = await appSvc.createApplication(name, type, ttlHours);
   return { application: res.data, error: res.error, next_allowed_at: res.next_allowed_at };
 }
 
@@ -81,4 +82,16 @@ export async function adminRotatePassword(
 ): Promise<{ success?: boolean; new_password?: string; new_url?: string; error?: string }> {
   const res = await adminSvc.rotatePassword(appId);
   return { success: res.success, new_password: res.data?.new_password, new_url: res.data?.new_url, error: res.error };
+}
+
+export async function adminGetStats(): Promise<{ stats?: adminSvc.AdminStats; error?: string }> {
+  const res = await adminSvc.fetchAdminStats();
+  return { stats: res.data, error: res.error };
+}
+
+export async function adminGetLogs(
+  options?: { limit?: number; event_type?: string }
+): Promise<{ logs?: adminSvc.AdminLog[]; error?: string }> {
+  const res = await adminSvc.fetchAdminLogs(options);
+  return { logs: res.data, error: res.error };
 }

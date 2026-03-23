@@ -53,48 +53,15 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { data: authUsersData, error: authUsersError } = await supabase
-      .rpc("get_all_auth_users");
+    // Fetch active users from auth.users
+    const { data: authUsersData } = await supabase.rpc("get_all_auth_users");
 
-    if (authUsersError) {
-      const { data: profiles } = await supabase.from("profiles").select("*");
-      const { data: apps } = await supabase
-        .from("applications")
-        .select("*")
-        .is("deleted_at", null);
-
-      const appsByUser = new Map<string, unknown[]>();
-      for (const app of apps || []) {
-        const list = appsByUser.get(app.user_id) || [];
-        list.push(mapApp(app));
-        appsByUser.set(app.user_id, list);
-      }
-
-      const users = (profiles || []).map((p) => ({
-        id: p.id,
-        email: "",
-        role: p.role || "user",
-        created_at: p.created_at,
-        full_name: p.name || "",
-        phone: p.phone || "",
-        bio: p.bio || "",
-        avatar_url: p.avatar_url || "",
-        applications: appsByUser.get(p.id) || [],
-      }));
-
-      return new Response(JSON.stringify({ users }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
+    // Fetch all profiles (active + soft-deleted)
     const { data: profiles } = await supabase.from("profiles").select("*");
-    const { data: apps } = await supabase
-      .from("applications")
-      .select("*")
-      .is("deleted_at", null);
 
-    const profilesMap = new Map((profiles || []).map((p) => [p.id, p]));
+    // Fetch all applications
+    const { data: apps } = await supabase.from("applications").select("*");
+
     const appsByUser = new Map<string, unknown[]>();
     for (const app of apps || []) {
       const list = appsByUser.get(app.user_id) || [];
@@ -102,13 +69,19 @@ Deno.serve(async (req: Request) => {
       appsByUser.set(app.user_id, list);
     }
 
-    const users = (authUsersData || []).map((u: { id: string; email: string; created_at: string }) => {
+    const profilesMap = new Map((profiles || []).map((p) => [p.id, p]));
+
+    // Active users: from auth.users (not yet deleted)
+    const activeAuthIds = new Set((authUsersData || []).map((u: { id: string }) => u.id));
+
+    const activeUsers = (authUsersData || []).map((u: { id: string; email: string; created_at: string; deleted_at: string | null }) => {
       const profile = profilesMap.get(u.id);
       return {
         id: u.id,
-        email: u.email || "",
+        email: u.email || profile?.email || "",
         role: profile?.role || "user",
         created_at: u.created_at,
+        deleted_at: null,
         full_name: profile?.name || "",
         phone: profile?.phone || "",
         bio: profile?.bio || "",
@@ -116,6 +89,24 @@ Deno.serve(async (req: Request) => {
         applications: appsByUser.get(u.id) || [],
       };
     });
+
+    // Deleted users: profiles with deleted_at set whose id is no longer in auth.users
+    const deletedUsers = (profiles || [])
+      .filter((p) => p.deleted_at && !activeAuthIds.has(p.id))
+      .map((p) => ({
+        id: p.id,
+        email: p.email || "",
+        role: p.role || "user",
+        created_at: p.created_at,
+        deleted_at: p.deleted_at,
+        full_name: p.name || "",
+        phone: p.phone || "",
+        bio: p.bio || "",
+        avatar_url: p.avatar_url || "",
+        applications: appsByUser.get(p.id) || [],
+      }));
+
+    const users = [...activeUsers, ...deletedUsers];
 
     return new Response(JSON.stringify({ users }), {
       status: 200,
@@ -135,16 +126,22 @@ function mapApp(app: Record<string, unknown>) {
     id: app.id,
     name: app.name,
     type: app.type,
-    amqp_url: app.amqp_url,
-    username: app.amqp_user,
-    password: app.amqp_password,
-    cloudamqp_id: app.cloudamqp_id,
-    panel_url: app.panel_url,
+    amqp_url: app.amqp_url || "",
+    username: app.amqp_user || app.mongo_user || "",
+    password: app.amqp_password || app.mongo_password || "",
+    cloudamqp_id: app.cloudamqp_id || "",
+    panel_url: app.panel_url || "",
     created_at: app.created_at,
+    deleted_at: app.deleted_at || null,
     mqtt_hostname: app.mqtt_host,
     mqtt_username: app.mqtt_user,
     mqtt_password: app.mqtt_password,
     mqtt_port: app.mqtt_port,
     mqtt_port_tls: app.mqtt_tls_port,
+    mongo_db: app.mongo_db,
+    mongo_user: app.mongo_user,
+    mongo_password: app.mongo_password,
+    mongo_collection: app.mongo_collection,
+    connection_url: app.connection_url,
   };
 }

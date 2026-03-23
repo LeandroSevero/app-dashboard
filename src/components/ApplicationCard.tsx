@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Copy,
   Eye,
@@ -9,6 +9,8 @@ import {
   ChevronDown,
   ChevronUp,
   BarChart3,
+  Timer,
+  AlertTriangle,
 } from "lucide-react";
 import type { Application } from "../types/database";
 
@@ -17,14 +19,43 @@ interface ApplicationCardProps {
   onDelete: (id: string) => void;
   deleting: boolean;
   onViewDetails: (app: Application) => void;
+  ownerEmail?: string;
 }
 
-export default function ApplicationCard({ app, onDelete, deleting, onViewDetails }: ApplicationCardProps) {
+function useCountdown(expiresAt: string | null | undefined) {
+  const [remaining, setRemaining] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!expiresAt) { setRemaining(null); return; }
+    const update = () => {
+      const diff = new Date(expiresAt).getTime() - Date.now();
+      setRemaining(diff > 0 ? diff : 0);
+    };
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [expiresAt]);
+
+  return remaining;
+}
+
+function formatCountdown(ms: number): string {
+  const totalSecs = Math.floor(ms / 1000);
+  const h = Math.floor(totalSecs / 3600);
+  const m = Math.floor((totalSecs % 3600) / 60);
+  const s = totalSecs % 60;
+  if (h > 0) return `${h}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
+  return `${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
+}
+
+export default function ApplicationCard({ app, onDelete, deleting, onViewDetails, ownerEmail }: ApplicationCardProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [showMqttPassword, setShowMqttPassword] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showMqtt, setShowMqtt] = useState(false);
+  const remaining = useCountdown(app.expires_at);
+  const isExpiringSoon = remaining !== null && remaining < 30 * 60 * 1000;
 
   async function copyToClipboard(text: string, field: string) {
     try {
@@ -36,9 +67,11 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
     }
   }
 
-  const typeLabel = app.type === "lavinmq" ? "LavinMQ" : "RabbitMQ";
+  const typeLabel = app.type === "lavinmq" ? "LavinMQ" : app.type === "mongodb" ? "MongoDB" : "RabbitMQ";
   const typeBadgeStyle = app.type === "lavinmq"
     ? { color: '#06b6d4', background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.2)' }
+    : app.type === "mongodb"
+    ? { color: '#22c55e', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)' }
     : { color: '#f97316', background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.2)' };
 
   const createdDate = new Date(app.created_at).toLocaleDateString("pt-BR", {
@@ -54,10 +87,10 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
 
   return (
     <div
-      className="rounded-2xl transition-all duration-200"
+      className="rounded-2xl transition-all duration-200 flex flex-col"
       style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}
     >
-      <div className="p-5">
+      <div className="p-5 flex flex-col flex-1">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
             <div
@@ -66,6 +99,8 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
             >
               {app.type === "lavinmq" ? (
                 <img src="/LavinMQ.svg" alt="LavinMQ" className="w-5 h-5" />
+              ) : app.type === "mongodb" ? (
+                <img src="/mongodb.svg" alt="MongoDB" className="w-5 h-5" />
               ) : (
                 <img src="/RabbitMQ.svg" alt="RabbitMQ" className="w-5 h-5" />
               )}
@@ -73,64 +108,121 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
             <div>
               <h3 className="font-semibold text-sm leading-tight" style={{ color: 'var(--color-fg)' }}>{app.name}</h3>
               <p className="text-xs mt-0.5" style={{ color: 'var(--color-fg-muted)' }}>{createdDate}</p>
+              {ownerEmail && (
+                <p className="text-xs mt-0.5 font-medium truncate max-w-[180px]" style={{ color: 'var(--color-primary)' }}>{ownerEmail}</p>
+              )}
             </div>
           </div>
-          <span className="text-xs font-medium px-2.5 py-1 rounded-lg" style={typeBadgeStyle}>
-            {typeLabel}
-          </span>
-        </div>
-
-        <div className="mb-3">
-          <p className="text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--color-fg-muted)' }}>Conexão do Painel Web</p>
-          <div className="space-y-2">
-            <CredentialRow label="Hostname" value={mqttHostname} field="mqtt_host" copiedField={copiedField} onCopy={copyToClipboard} />
-            <CredentialRow
-              label="Portas"
-              value={`${app.mqtt_port ?? 1883} (${app.mqtt_port_tls ?? 8883} TLS)`}
-              field="mqtt_ports"
-              copiedField={copiedField}
-              onCopy={copyToClipboard}
-            />
-            <CredentialRow label="Usuário" value={mqttUsername} field="mqtt_user" copiedField={copiedField} onCopy={copyToClipboard} />
-            <PasswordRow
-              label="Senha"
-              value={mqttPassword}
-              field="mqtt_pass"
-              show={showMqttPassword}
-              onToggleShow={() => setShowMqttPassword(!showMqttPassword)}
-              copiedField={copiedField}
-              onCopy={copyToClipboard}
-            />
+          <div className="flex flex-col items-end gap-1.5">
+            <span className="text-xs font-medium px-2.5 py-1 rounded-lg" style={typeBadgeStyle}>
+              {typeLabel}
+            </span>
+            {remaining !== null && (
+              <span
+                className="flex items-center gap-1 text-xs font-mono px-2 py-0.5 rounded-lg"
+                style={
+                  remaining === 0
+                    ? { color: "#ef4444", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }
+                    : isExpiringSoon
+                    ? { color: "#f59e0b", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)" }
+                    : { color: "var(--color-fg-muted)", background: "var(--color-bg-secondary)", border: "1px solid var(--color-border)" }
+                }
+              >
+                {remaining === 0 ? (
+                  <AlertTriangle className="w-3 h-3" />
+                ) : (
+                  <Timer className="w-3 h-3" />
+                )}
+                {remaining === 0 ? "Expirado" : formatCountdown(remaining)}
+              </span>
+            )}
           </div>
         </div>
 
-        <button
-          onClick={() => setShowMqtt(!showMqtt)}
-          className="w-full flex items-center justify-between py-2 px-3 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all"
-          style={{
-            background: showMqtt ? 'var(--color-bg-secondary)' : 'transparent',
-            color: 'var(--color-fg-muted)',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          <span>Conexão da Aplicação</span>
-          {showMqtt ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-        </button>
-
-        {showMqtt && (
-          <div className="mt-2 space-y-2">
-            <CredentialRow label="URL" value={app.amqp_url} field="url" copiedField={copiedField} onCopy={copyToClipboard} />
-            <CredentialRow label="Usuário" value={app.username} field="username" copiedField={copiedField} onCopy={copyToClipboard} />
-            <PasswordRow
-              label="Senha"
-              value={app.password}
-              field="password"
-              show={showPassword}
-              onToggleShow={() => setShowPassword(!showPassword)}
-              copiedField={copiedField}
-              onCopy={copyToClipboard}
-            />
+        {app.type === "mongodb" ? (
+          <div className="flex-1 flex flex-col">
+            <p className="text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--color-fg-muted)' }}>Conexão</p>
+            <div className="space-y-2 flex-1">
+              <PasswordRow
+                label="Connection"
+                value={app.connection_url || ""}
+                field="connection_url"
+                show={showPassword}
+                onToggleShow={() => setShowPassword(!showPassword)}
+                copiedField={copiedField}
+                onCopy={copyToClipboard}
+              />
+              <CredentialRow label="Database" value={app.mongo_db || ""} field="mongo_db" copiedField={copiedField} onCopy={copyToClipboard} />
+              {app.mongo_collection && (
+                <CredentialRow label="Collection" value={app.mongo_collection} field="mongo_collection" copiedField={copiedField} onCopy={copyToClipboard} />
+              )}
+              <CredentialRow label="Usuário" value={app.mongo_user || ""} field="mongo_user" copiedField={copiedField} onCopy={copyToClipboard} />
+              <PasswordRow
+                label="Senha"
+                value={app.mongo_password || ""}
+                field="mongo_password"
+                show={showMqttPassword}
+                onToggleShow={() => setShowMqttPassword(!showMqttPassword)}
+                copiedField={copiedField}
+                onCopy={copyToClipboard}
+              />
+            </div>
           </div>
+        ) : (
+          <>
+            <div className="mb-3">
+              <p className="text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--color-fg-muted)' }}>Conexão do Painel Web</p>
+              <div className="space-y-2">
+                <CredentialRow label="Hostname" value={mqttHostname} field="mqtt_host" copiedField={copiedField} onCopy={copyToClipboard} />
+                <CredentialRow
+                  label="Portas"
+                  value={`${app.mqtt_port ?? 1883} (${app.mqtt_port_tls ?? 8883} TLS)`}
+                  field="mqtt_ports"
+                  copiedField={copiedField}
+                  onCopy={copyToClipboard}
+                />
+                <CredentialRow label="Usuário" value={mqttUsername} field="mqtt_user" copiedField={copiedField} onCopy={copyToClipboard} />
+                <PasswordRow
+                  label="Senha"
+                  value={mqttPassword}
+                  field="mqtt_pass"
+                  show={showMqttPassword}
+                  onToggleShow={() => setShowMqttPassword(!showMqttPassword)}
+                  copiedField={copiedField}
+                  onCopy={copyToClipboard}
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowMqtt(!showMqtt)}
+              className="w-full flex items-center justify-between py-2 px-3 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all"
+              style={{
+                background: showMqtt ? 'var(--color-bg-secondary)' : 'transparent',
+                color: 'var(--color-fg-muted)',
+                border: '1px solid var(--color-border)',
+              }}
+            >
+              <span>Conexão da Aplicação</span>
+              {showMqtt ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
+
+            {showMqtt && (
+              <div className="mt-2 space-y-2">
+                <CredentialRow label="URL" value={app.amqp_url} field="url" copiedField={copiedField} onCopy={copyToClipboard} />
+                <CredentialRow label="Usuário" value={app.username} field="username" copiedField={copiedField} onCopy={copyToClipboard} />
+                <PasswordRow
+                  label="Senha"
+                  value={app.password}
+                  field="password"
+                  show={showPassword}
+                  onToggleShow={() => setShowPassword(!showPassword)}
+                  copiedField={copiedField}
+                  onCopy={copyToClipboard}
+                />
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -140,12 +232,7 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
       >
         <button
           onClick={() => onViewDetails(app)}
-          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all"
-          style={{
-            color: 'var(--color-fg-muted)',
-            background: 'var(--color-bg-secondary)',
-            border: '1px solid var(--color-border)',
-          }}
+          className="btn-glass flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg"
         >
           <BarChart3 className="w-3 h-3" />
           Ver detalhes
@@ -155,12 +242,7 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
             href={panelUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all"
-            style={{
-              color: 'var(--color-primary)',
-              background: 'color-mix(in srgb, var(--color-primary) 8%, transparent)',
-              border: '1px solid color-mix(in srgb, var(--color-primary) 20%, transparent)',
-            }}
+            className="btn-glass-primary flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg"
           >
             <ExternalLink className="w-3 h-3" />
             Abrir painel
@@ -173,15 +255,13 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
             <button
               onClick={() => onDelete(app.id)}
               disabled={deleting}
-              className="text-xs font-medium px-2.5 py-1 rounded-lg transition-all disabled:opacity-50"
-              style={{ color: '#ef4444', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}
+              className="btn-glass-danger text-xs font-medium px-2.5 py-1 rounded-lg disabled:opacity-50"
             >
               {deleting ? "..." : "Sim"}
             </button>
             <button
               onClick={() => setConfirmDelete(false)}
-              className="text-xs font-medium px-2.5 py-1 rounded-lg transition-all"
-              style={{ color: 'var(--color-fg-muted)', background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}
+              className="btn-glass text-xs font-medium px-2.5 py-1 rounded-lg"
             >
               Não
             </button>
@@ -189,8 +269,7 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
         ) : (
           <button
             onClick={() => setConfirmDelete(true)}
-            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-all"
-            style={{ color: 'var(--color-fg-muted)', border: '1px solid transparent' }}
+            className="btn-glass-danger flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg"
           >
             <Trash2 className="w-3 h-3" />
             Deletar

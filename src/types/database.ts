@@ -8,11 +8,19 @@ export interface Application {
   cloudamqp_id: string;
   panel_url: string;
   created_at: string;
+  user_id?: string;
   mqtt_hostname?: string;
   mqtt_username?: string;
   mqtt_password?: string;
   mqtt_port?: number;
   mqtt_port_tls?: number;
+  mongo_db?: string;
+  mongo_user?: string;
+  mongo_password?: string;
+  mongo_collection?: string;
+  connection_url?: string;
+  expires_at?: string | null;
+  deleted_at?: string | null;
 }
 
 export interface UserProfile {
@@ -29,6 +37,7 @@ export interface AdminUser {
   email: string;
   role: "admin" | "user";
   created_at: string;
+  deleted_at?: string | null;
   full_name?: string;
   phone?: string;
   bio?: string;

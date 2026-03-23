@@ -9,6 +9,10 @@ import {
   ChevronRight,
   Users,
   User,
+  Database,
+  ScrollText,
+  Settings,
+  Boxes,
 } from "lucide-react";
 
 interface NavItem {
@@ -27,7 +31,7 @@ interface SidebarProps {
   profileCompletion?: number;
 }
 
-const navItems: NavItem[] = [
+const userNavItems: NavItem[] = [
   { icon: <LayoutDashboard className="w-4 h-4" />, label: "Dashboard", section: "dashboard", available: true },
   { icon: <Server className="w-4 h-4" />, label: "Aplicações", section: "applications", available: true },
   { icon: <BookOpen className="w-4 h-4" />, label: "Cursos", section: "courses", available: false },
@@ -37,13 +41,22 @@ const navItems: NavItem[] = [
   { icon: <BarChart3 className="w-4 h-4" />, label: "Observabilidade", section: "observability", available: false },
 ];
 
-const adminItems: NavItem[] = [
+const adminNavItems: NavItem[] = [
+  { icon: <LayoutDashboard className="w-4 h-4" />, label: "Dashboard", section: "admin-dashboard", available: true, adminOnly: true },
+  { icon: <Server className="w-4 h-4" />, label: "Aplicações", section: "applications", available: true },
+];
+
+const adminOnlyItems: NavItem[] = [
   { icon: <Users className="w-4 h-4" />, label: "Usuários", section: "admin-users", available: true, adminOnly: true },
-  { icon: <Server className="w-4 h-4" />, label: "Aplicações", section: "admin-apps", available: true, adminOnly: true },
+  { icon: <Boxes className="w-4 h-4" />, label: "Aplicações", section: "admin-apps", available: true, adminOnly: true },
+  { icon: <Database className="w-4 h-4" />, label: "Recursos", section: "admin-resources", available: true, adminOnly: true },
+  { icon: <ScrollText className="w-4 h-4" />, label: "Logs", section: "admin-logs", available: true, adminOnly: true },
+  { icon: <Settings className="w-4 h-4" />, label: "Configurações", section: "admin-settings", available: false, adminOnly: true },
 ];
 
 export default function Sidebar({ activeSection, onSectionChange, collapsed, isAdmin, profileCompletion }: SidebarProps) {
   const showProfileWarning = !isAdmin && profileCompletion !== undefined && profileCompletion < 100;
+  const navItems = isAdmin ? adminNavItems : userNavItems;
 
   return (
     <aside
@@ -67,7 +80,7 @@ export default function Sidebar({ activeSection, onSectionChange, collapsed, isA
           <div className="overflow-hidden">
             <p className="font-semibold text-sm leading-tight" style={{ color: 'var(--color-fg)' }}>Leandro Severo</p>
             <p className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>
-              {isAdmin ? "Admin" : "Painel"}
+              {isAdmin ? "Administrador" : "Painel"}
             </p>
           </div>
         )}
@@ -114,7 +127,7 @@ export default function Sidebar({ activeSection, onSectionChange, collapsed, isA
               </div>
             )}
             {collapsed && <div className="h-px mx-2 my-2" style={{ background: 'var(--color-border)' }} />}
-            {adminItems.map((item) => (
+            {adminOnlyItems.map((item) => (
               <NavButton
                 key={item.section}
                 item={item}
@@ -190,7 +203,7 @@ function NavButton({ item, isActive, collapsed, onSelect, badge }: NavButtonProp
               {badge}
             </span>
           )}
-          {isActive && !badge && <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--color-primary)' }} />}
+          {isActive && !badge && item.available && <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--color-primary)' }} />}
         </>
       )}
     </button>

@@ -8,17 +8,25 @@ function mapRow(row: Record<string, unknown>): Application {
     id: row.id as string,
     name: row.name as string,
     type: row.type as string,
-    amqp_url: row.amqp_url as string,
-    username: row.amqp_user as string,
-    password: row.amqp_password as string,
-    cloudamqp_id: row.cloudamqp_id as string,
-    panel_url: row.panel_url as string,
+    amqp_url: (row.amqp_url as string) || "",
+    username: (row.amqp_user as string) || (row.mongo_user as string) || "",
+    password: (row.amqp_password as string) || (row.mongo_password as string) || "",
+    cloudamqp_id: (row.cloudamqp_id as string) || "",
+    panel_url: (row.panel_url as string) || "",
     created_at: row.created_at as string,
+    user_id: (row.user_id as string) || undefined,
     mqtt_hostname: (row.mqtt_host as string) || undefined,
     mqtt_username: (row.mqtt_user as string) || undefined,
     mqtt_password: (row.mqtt_password as string) || undefined,
     mqtt_port: (row.mqtt_port as number) || undefined,
     mqtt_port_tls: (row.mqtt_tls_port as number) || undefined,
+    mongo_db: (row.mongo_db as string) || undefined,
+    mongo_user: (row.mongo_user as string) || undefined,
+    mongo_password: (row.mongo_password as string) || undefined,
+    mongo_collection: (row.mongo_collection as string) || undefined,
+    connection_url: (row.connection_url as string) || undefined,
+    expires_at: (row.expires_at as string | null) ?? null,
+    deleted_at: (row.deleted_at as string | null) ?? null,
   };
 }
 
@@ -43,7 +51,8 @@ export async function fetchApplications(): Promise<ApiResponse<Application[]>> {
 
 export async function createApplication(
   name: string,
-  type: string
+  type: string,
+  ttlHours: number | null = null
 ): Promise<ApiResponse<Application> & { next_allowed_at?: string }> {
   try {
     const token = await getValidToken();
@@ -60,7 +69,7 @@ export async function createApplication(
         Authorization: `Bearer ${token}`,
         Apikey: SUPABASE_ANON_KEY,
       },
-      body: JSON.stringify({ name: name.trim(), type }),
+      body: JSON.stringify({ name: name.trim(), type, ttl_hours: ttlHours }),
     });
 
     let json: Record<string, unknown> = {};

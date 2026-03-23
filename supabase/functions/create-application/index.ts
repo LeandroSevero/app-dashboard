@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { default as md5sync } from "npm:md5@2.3.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,6 +10,12 @@ const corsHeaders = {
 
 const CLOUDAMQP_API_KEY = Deno.env.get("CLOUDAMQP_API_KEY") || "";
 const CLOUDAMQP_BASE_URL = "https://customer.cloudamqp.com/api";
+
+const ATLAS_PUBLIC_KEY = (Deno.env.get("Public_Key") || "").trim();
+const ATLAS_PRIVATE_KEY = (Deno.env.get("Private_Key") || "").trim();
+const ATLAS_PROJECT_ID = (Deno.env.get("Project_ID") || "").trim();
+const ATLAS_BASE_URL = "https://cloud.mongodb.com/api/atlas/v2";
+const ATLAS_CLUSTER_NAME = (Deno.env.get("ATLAS_CLUSTER_NAME") || "aplicacoes-mongodb").trim();
 
 const PLAN_MAP: Record<string, string> = {
   rabbitmq: "lemur",
@@ -36,6 +43,81 @@ function parseAmqpUrl(url: string): { username: string; password: string; hostna
   }
 }
 
+function generateSecurePassword(length = 24): string {
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  const arr = new Uint8Array(length);
+  crypto.getRandomValues(arr);
+  return Array.from(arr).map((b) => chars[b % chars.length]).join("");
+}
+
+async function digestAuth(method: string, url: string, body?: unknown): Promise<Response> {
+  const firstRes = await fetch(url, {
+    method,
+    headers: { "Accept": "application/vnd.atlas.2023-01-01+json", "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  if (firstRes.status !== 401) return firstRes;
+
+  const wwwAuth = firstRes.headers.get("WWW-Authenticate") || "";
+  const realmMatch = wwwAuth.match(/realm="([^"]+)"/);
+  const nonceMatch = wwwAuth.match(/nonce="([^"]+)"/);
+  const qopMatch = wwwAuth.match(/qop="?([^",]+)"?/);
+
+  if (!realmMatch || !nonceMatch) throw new Error("Digest auth: missing realm or nonce");
+
+  const realm = realmMatch[1];
+  const nonce = nonceMatch[1];
+  const qop = qopMatch ? qopMatch[1].trim() : "";
+  const nc = "00000001";
+  const cnonce = Array.from(crypto.getRandomValues(new Uint8Array(8))).map(b => b.toString(16).padStart(2, "0")).join("");
+  const uri = new URL(url).pathname + new URL(url).search;
+
+  const ha1 = await md5(`${ATLAS_PUBLIC_KEY}:${realm}:${ATLAS_PRIVATE_KEY}`);
+  const ha2 = await md5(`${method}:${uri}`);
+
+  let response: string;
+  let authHeader: string;
+
+  if (qop === "auth") {
+    response = await md5(`${ha1}:${nonce}:${nc}:${cnonce}:${qop}:${ha2}`);
+    authHeader = `Digest username="${ATLAS_PUBLIC_KEY}", realm="${realm}", nonce="${nonce}", uri="${uri}", qop=${qop}, nc=${nc}, cnonce="${cnonce}", response="${response}"`;
+  } else {
+    response = await md5(`${ha1}:${nonce}:${ha2}`);
+    authHeader = `Digest username="${ATLAS_PUBLIC_KEY}", realm="${realm}", nonce="${nonce}", uri="${uri}", response="${response}"`;
+  }
+
+  return fetch(url, {
+    method,
+    headers: {
+      "Authorization": authHeader,
+      "Accept": "application/vnd.atlas.2023-01-01+json",
+      "Content-Type": "application/json",
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+}
+
+async function md5(message: string): Promise<string> {
+  return md5sync(message);
+}
+
+async function atlasGet(path: string): Promise<unknown> {
+  const url = `${ATLAS_BASE_URL}${path}`;
+  const res = await digestAuth("GET", url);
+  const text = await res.text();
+  if (!res.ok) throw new Error(`Atlas GET ${path} ${res.status}: ${text}`);
+  return JSON.parse(text);
+}
+
+async function atlasPost(path: string, body: unknown): Promise<unknown> {
+  const url = `${ATLAS_BASE_URL}${path}`;
+  const res = await digestAuth("POST", url, body);
+  const text = await res.text();
+  if (!res.ok) throw new Error(`Atlas POST ${path} ${res.status}: ${text}`);
+  return JSON.parse(text);
+}
+
 async function cloudamqpGet(path: string) {
   const credentials = btoa(`:${CLOUDAMQP_API_KEY}`);
   const res = await fetch(`${CLOUDAMQP_BASE_URL}${path}`, {
@@ -49,11 +131,10 @@ async function cloudamqpGet(path: string) {
 
 async function cloudamqpPost(path: string, body: unknown) {
   const credentials = btoa(`:${CLOUDAMQP_API_KEY}`);
-  const bodyJson = JSON.stringify(body);
   const res = await fetch(`${CLOUDAMQP_BASE_URL}${path}`, {
     method: "POST",
     headers: { Authorization: `Basic ${credentials}`, "Content-Type": "application/json" },
-    body: bodyJson,
+    body: JSON.stringify(body),
   });
   const text = await res.text();
   if (!res.ok) throw new Error(`CloudAMQP POST ${path} ${res.status}: ${text}`);
@@ -61,7 +142,7 @@ async function cloudamqpPost(path: string, body: unknown) {
   return JSON.parse(text);
 }
 
-interface InstanceDetails {
+interface AmqpInstanceDetails {
   amqpUrl: string;
   username: string;
   password: string;
@@ -74,7 +155,54 @@ interface InstanceDetails {
   cloudamqpId: string;
 }
 
-async function provisionInstance(name: string, type: string): Promise<InstanceDetails> {
+async function getClusterHostname(): Promise<string> {
+  try {
+    const data = await atlasGet(`/groups/${ATLAS_PROJECT_ID}/clusters/${ATLAS_CLUSTER_NAME}`) as { connectionStrings?: { standardSrv?: string } };
+    const srv = data?.connectionStrings?.standardSrv || "";
+    if (srv) {
+      const match = srv.match(/mongodb\+srv:\/\/(.+)/);
+      if (match) return match[1];
+    }
+  } catch {
+    /* fallback */
+  }
+  return "aplicacoes-mongodb.eo9pc4t.mongodb.net";
+}
+
+interface MongoInstanceDetails {
+  connectionUrl: string;
+  dbName: string;
+  dbUser: string;
+  dbPassword: string;
+  collectionName: string;
+}
+
+async function provisionMongoInstance(userId: string): Promise<MongoInstanceDetails> {
+  const shortId = userId.replace(/-/g, "").substring(0, 12);
+  const dbName = `app_${shortId}`;
+  const dbUser = `user_${shortId}`;
+  const dbPassword = generateSecurePassword(24);
+  const collectionName = "main";
+
+  await atlasPost(`/groups/${ATLAS_PROJECT_ID}/databaseUsers`, {
+    databaseName: "admin",
+    username: dbUser,
+    password: dbPassword,
+    roles: [
+      { roleName: "readWrite", databaseName: dbName },
+    ],
+    scopes: [
+      { name: ATLAS_CLUSTER_NAME, type: "CLUSTER" },
+    ],
+  });
+
+  const clusterHost = await getClusterHostname();
+  const connectionUrl = `mongodb+srv://${dbUser}:${encodeURIComponent(dbPassword)}@${clusterHost}/${dbName}?retryWrites=true&w=majority`;
+
+  return { connectionUrl, dbName, dbUser, dbPassword, collectionName };
+}
+
+async function provisionAmqpInstance(name: string, type: string): Promise<AmqpInstanceDetails> {
   const plan = PLAN_MAP[type];
   if (!plan) throw new Error(`Tipo inválido: "${type}". Use rabbitmq ou lavinmq`);
 
@@ -176,46 +304,97 @@ Deno.serve(async (req: Request) => {
     const { data: { user }, error: authError } = await userClient.auth.getUser();
     if (authError || !user) return jsonResponse({ success: false, error: "Não autorizado" }, 401);
 
-    let body: { name?: string; type?: string };
+    let body: { name?: string; type?: string; ttl_hours?: number };
     try {
       body = await req.json();
     } catch {
       return jsonResponse({ success: false, error: "Payload inválido" }, 400);
     }
 
-    const { name, type } = body;
+    const { name, type, ttl_hours } = body;
     if (!name || !type) return jsonResponse({ success: false, error: "name e type são obrigatórios" }, 400);
 
+    const ttlHours = typeof ttl_hours === "number" && [6, 12, 18, 24].includes(ttl_hours) ? ttl_hours : null;
+    const expiresAt = ttlHours ? new Date(Date.now() + ttlHours * 60 * 60 * 1000).toISOString() : null;
+
     const normalizedType = type.toLowerCase();
-    if (!["rabbitmq", "lavinmq"].includes(normalizedType)) {
-      return jsonResponse({ success: false, error: `Tipo inválido: "${type}". Use rabbitmq ou lavinmq` }, 400);
+    if (!["rabbitmq", "lavinmq", "mongodb"].includes(normalizedType)) {
+      return jsonResponse({ success: false, error: `Tipo inválido: "${type}". Use rabbitmq, lavinmq ou mongodb` }, 400);
     }
 
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data: limitData } = await supabase
       .from("user_limits")
-      .select("last_created_at")
+      .select("last_created_at, max_apps")
       .eq("user_id", user.id)
       .eq("app_type", normalizedType)
       .maybeSingle();
 
     if (limitData?.last_created_at && limitData.last_created_at > twentyFourHoursAgo) {
       const nextAllowed = new Date(new Date(limitData.last_created_at).getTime() + 24 * 60 * 60 * 1000);
+      const typeLabel = normalizedType === "rabbitmq" ? "RabbitMQ" : normalizedType === "lavinmq" ? "LavinMQ" : "MongoDB";
       return jsonResponse({
         success: false,
         error: "Limite de criação atingido",
-        message: `Você só pode criar 1 ${normalizedType === "rabbitmq" ? "RabbitMQ" : "LavinMQ"} a cada 24 horas.`,
+        message: `Você só pode criar 1 ${typeLabel} a cada 24 horas.`,
         next_allowed_at: nextAllowed.toISOString(),
       }, 429);
     }
 
     const finalName = await resolveUniqueName(supabase, user.id, name);
-    const instance = await provisionInstance(finalName, normalizedType);
-
     const now = new Date().toISOString();
-    const { data: app, error: insertError } = await supabase
-      .from("applications")
-      .insert({
+
+    let insertData: Record<string, unknown>;
+    let responseApplication: Record<string, unknown>;
+
+    if (normalizedType === "mongodb") {
+      const mongo = await provisionMongoInstance(user.id);
+
+      insertData = {
+        user_id: user.id,
+        name: finalName,
+        type: normalizedType,
+        amqp_url: "",
+        amqp_user: mongo.dbUser,
+        amqp_password: mongo.dbPassword,
+        mongo_db: mongo.dbName,
+        mongo_user: mongo.dbUser,
+        mongo_password: mongo.dbPassword,
+        mongo_collection: mongo.collectionName,
+        connection_url: mongo.connectionUrl,
+        expires_at: expiresAt,
+        created_at: now,
+      };
+
+      const { data: app, error: insertError } = await supabase
+        .from("applications")
+        .insert(insertData)
+        .select()
+        .single();
+
+      if (insertError) throw new Error(`Erro ao salvar aplicação: ${insertError.message}`);
+
+      responseApplication = {
+        id: app.id,
+        name: app.name,
+        type: app.type,
+        username: mongo.dbUser,
+        password: mongo.dbPassword,
+        mongo_db: mongo.dbName,
+        mongo_user: mongo.dbUser,
+        mongo_password: mongo.dbPassword,
+        mongo_collection: mongo.collectionName,
+        connection_url: mongo.connectionUrl,
+        amqp_url: "",
+        cloudamqp_id: "",
+        panel_url: "",
+        created_at: app.created_at,
+        expires_at: expiresAt,
+      };
+    } else {
+      const instance = await provisionAmqpInstance(finalName, normalizedType);
+
+      insertData = {
         user_id: user.id,
         name: finalName,
         type: normalizedType,
@@ -229,27 +408,19 @@ Deno.serve(async (req: Request) => {
         mqtt_tls_port: instance.mqttTlsPort,
         mqtt_user: instance.username,
         mqtt_password: instance.password,
+        expires_at: expiresAt,
         created_at: now,
-      })
-      .select()
-      .single();
+      };
 
-    if (insertError) throw new Error(`Erro ao salvar aplicação: ${insertError.message}`);
+      const { data: app, error: insertError } = await supabase
+        .from("applications")
+        .insert(insertData)
+        .select()
+        .single();
 
-    await supabase
-      .from("user_limits")
-      .upsert({ user_id: user.id, app_type: normalizedType, last_created_at: now }, { onConflict: "user_id,app_type" });
+      if (insertError) throw new Error(`Erro ao salvar aplicação: ${insertError.message}`);
 
-    await supabase.from("app_events").insert({
-      user_id: user.id,
-      application_id: app.id,
-      event_type: "create",
-      meta: { name: finalName, type: normalizedType },
-    }).then(() => {});
-
-    return jsonResponse({
-      success: true,
-      application: {
+      responseApplication = {
         id: app.id,
         name: app.name,
         type: app.type,
@@ -264,8 +435,22 @@ Deno.serve(async (req: Request) => {
         mqtt_username: app.mqtt_user,
         mqtt_password: app.mqtt_password,
         created_at: app.created_at,
-      },
-    });
+        expires_at: expiresAt,
+      };
+    }
+
+    await supabase
+      .from("user_limits")
+      .upsert({ user_id: user.id, app_type: normalizedType, last_created_at: now }, { onConflict: "user_id,app_type" });
+
+    await supabase.from("app_events").insert({
+      user_id: user.id,
+      application_id: (responseApplication as { id: string }).id,
+      event_type: "create",
+      meta: { name: finalName, type: normalizedType },
+    }).then(() => {});
+
+    return jsonResponse({ success: true, application: responseApplication });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erro interno do servidor";
     return jsonResponse({ success: false, error: message }, 500);
