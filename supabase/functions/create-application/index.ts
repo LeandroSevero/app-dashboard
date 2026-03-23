@@ -10,6 +10,12 @@ const corsHeaders = {
 const CLOUDAMQP_API_KEY = Deno.env.get("CLOUDAMQP_API_KEY") || "";
 const CLOUDAMQP_BASE_URL = "https://customer.cloudamqp.com/api";
 
+const ATLAS_PUBLIC_KEY = Deno.env.get("Public_Key") || "";
+const ATLAS_PRIVATE_KEY = Deno.env.get("Private_Key") || "";
+const ATLAS_PROJECT_ID = Deno.env.get("Project_ID") || "";
+const ATLAS_BASE_URL = "https://cloud.mongodb.com/api/atlas/v2";
+const ATLAS_CLUSTER_NAME = Deno.env.get("ATLAS_CLUSTER_NAME") || "aplicacoes-mongodb";
+
 const PLAN_MAP: Record<string, string> = {
   rabbitmq: "lemur",
   lavinmq: "lemming",
@@ -41,6 +47,77 @@ function generateSecurePassword(length = 24): string {
   const arr = new Uint8Array(length);
   crypto.getRandomValues(arr);
   return Array.from(arr).map((b) => chars[b % chars.length]).join("");
+}
+
+async function digestAuth(method: string, url: string, body?: unknown): Promise<Response> {
+  const firstRes = await fetch(url, {
+    method,
+    headers: { "Accept": "application/vnd.atlas.2023-01-01+json", "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  if (firstRes.status !== 401) return firstRes;
+
+  const wwwAuth = firstRes.headers.get("WWW-Authenticate") || "";
+  const realmMatch = wwwAuth.match(/realm="([^"]+)"/);
+  const nonceMatch = wwwAuth.match(/nonce="([^"]+)"/);
+  const qopMatch = wwwAuth.match(/qop="?([^",]+)"?/);
+
+  if (!realmMatch || !nonceMatch) throw new Error("Digest auth: missing realm or nonce");
+
+  const realm = realmMatch[1];
+  const nonce = nonceMatch[1];
+  const qop = qopMatch ? qopMatch[1].trim() : "";
+  const nc = "00000001";
+  const cnonce = Array.from(crypto.getRandomValues(new Uint8Array(8))).map(b => b.toString(16).padStart(2, "0")).join("");
+  const uri = new URL(url).pathname + new URL(url).search;
+
+  const ha1 = await md5(`${ATLAS_PUBLIC_KEY}:${realm}:${ATLAS_PRIVATE_KEY}`);
+  const ha2 = await md5(`${method}:${uri}`);
+
+  let response: string;
+  let authHeader: string;
+
+  if (qop === "auth") {
+    response = await md5(`${ha1}:${nonce}:${nc}:${cnonce}:${qop}:${ha2}`);
+    authHeader = `Digest username="${ATLAS_PUBLIC_KEY}", realm="${realm}", nonce="${nonce}", uri="${uri}", qop=${qop}, nc=${nc}, cnonce="${cnonce}", response="${response}"`;
+  } else {
+    response = await md5(`${ha1}:${nonce}:${ha2}`);
+    authHeader = `Digest username="${ATLAS_PUBLIC_KEY}", realm="${realm}", nonce="${nonce}", uri="${uri}", response="${response}"`;
+  }
+
+  return fetch(url, {
+    method,
+    headers: {
+      "Authorization": authHeader,
+      "Accept": "application/vnd.atlas.2023-01-01+json",
+      "Content-Type": "application/json",
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+}
+
+async function md5(message: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(message);
+  const hashBuffer = await crypto.subtle.digest("MD5", data);
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function atlasGet(path: string): Promise<unknown> {
+  const url = `${ATLAS_BASE_URL}${path}`;
+  const res = await digestAuth("GET", url);
+  const text = await res.text();
+  if (!res.ok) throw new Error(`Atlas GET ${path} ${res.status}: ${text}`);
+  return JSON.parse(text);
+}
+
+async function atlasPost(path: string, body: unknown): Promise<unknown> {
+  const url = `${ATLAS_BASE_URL}${path}`;
+  const res = await digestAuth("POST", url, body);
+  const text = await res.text();
+  if (!res.ok) throw new Error(`Atlas POST ${path} ${res.status}: ${text}`);
+  return JSON.parse(text);
 }
 
 async function cloudamqpGet(path: string) {
@@ -85,6 +162,44 @@ interface MongoInstanceDetails {
   dbName: string;
   dbUser: string;
   dbPassword: string;
+}
+
+async function getClusterHostname(): Promise<string> {
+  try {
+    const data = await atlasGet(`/groups/${ATLAS_PROJECT_ID}/clusters/${ATLAS_CLUSTER_NAME}`) as { connectionStrings?: { standardSrv?: string } };
+    const srv = data?.connectionStrings?.standardSrv || "";
+    if (srv) {
+      const match = srv.match(/mongodb\+srv:\/\/(.+)/);
+      if (match) return match[1];
+    }
+  } catch {
+    /* fallback */
+  }
+  return "aplicacoes-mongodb.eo9pc4t.mongodb.net";
+}
+
+async function provisionMongoInstance(userId: string): Promise<MongoInstanceDetails> {
+  const shortId = userId.replace(/-/g, "").substring(0, 12);
+  const dbName = `app_${shortId}`;
+  const dbUser = `user_${shortId}`;
+  const dbPassword = generateSecurePassword(24);
+
+  await atlasPost(`/groups/${ATLAS_PROJECT_ID}/databaseUsers`, {
+    databaseName: "admin",
+    username: dbUser,
+    password: dbPassword,
+    roles: [
+      { roleName: "readWrite", databaseName: dbName },
+    ],
+    scopes: [
+      { name: ATLAS_CLUSTER_NAME, type: "CLUSTER" },
+    ],
+  });
+
+  const clusterHost = await getClusterHostname();
+  const connectionUrl = `mongodb+srv://${dbUser}:${encodeURIComponent(dbPassword)}@${clusterHost}/${dbName}?retryWrites=true&w=majority`;
+
+  return { connectionUrl, dbName, dbUser, dbPassword };
 }
 
 async function provisionAmqpInstance(name: string, type: string): Promise<AmqpInstanceDetails> {
@@ -142,42 +257,6 @@ async function provisionAmqpInstance(name: string, type: string): Promise<AmqpIn
     mqttTlsPort: 8883,
     cloudamqpId: instanceId,
   };
-}
-
-async function provisionMongoInstance(userId: string): Promise<MongoInstanceDetails> {
-  const shortId = userId.replace(/-/g, "").substring(0, 12);
-  const dbName = `app_${shortId}`;
-  const dbUser = `user_${shortId}`;
-  const dbPassword = generateSecurePassword(24);
-
-  const MONGODB_URI = Deno.env.get("aplicacoes_MONGODB_URI") || "";
-
-  if (!MONGODB_URI) {
-    const mockHost = "cluster0.example.mongodb.net";
-    return {
-      connectionUrl: `mongodb+srv://${dbUser}:${encodeURIComponent(dbPassword)}@${mockHost}/${dbName}?retryWrites=true&w=majority`,
-      dbName,
-      dbUser,
-      dbPassword,
-    };
-  }
-
-  try {
-    const parsedUri = new URL(MONGODB_URI.replace("mongodb+srv://", "https://"));
-    const clusterHost = parsedUri.hostname;
-
-    const connectionUrl = `mongodb+srv://${dbUser}:${encodeURIComponent(dbPassword)}@${clusterHost}/${dbName}?retryWrites=true&w=majority`;
-
-    return { connectionUrl, dbName, dbUser, dbPassword };
-  } catch {
-    const mockHost = "cluster0.example.mongodb.net";
-    return {
-      connectionUrl: `mongodb+srv://${dbUser}:${encodeURIComponent(dbPassword)}@${mockHost}/${dbName}?retryWrites=true&w=majority`,
-      dbName,
-      dbUser,
-      dbPassword,
-    };
-  }
 }
 
 async function resolveUniqueName(
