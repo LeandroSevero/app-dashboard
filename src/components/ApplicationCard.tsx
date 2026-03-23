@@ -19,6 +19,7 @@ interface ApplicationCardProps {
   onDelete: (id: string) => void;
   deleting: boolean;
   onViewDetails: (app: Application) => void;
+  ownerEmail?: string;
 }
 
 function useCountdown(expiresAt: string | null | undefined) {
@@ -47,7 +48,7 @@ function formatCountdown(ms: number): string {
   return `${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
 }
 
-export default function ApplicationCard({ app, onDelete, deleting, onViewDetails }: ApplicationCardProps) {
+export default function ApplicationCard({ app, onDelete, deleting, onViewDetails, ownerEmail }: ApplicationCardProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [showMqttPassword, setShowMqttPassword] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -107,6 +108,9 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
             <div>
               <h3 className="font-semibold text-sm leading-tight" style={{ color: 'var(--color-fg)' }}>{app.name}</h3>
               <p className="text-xs mt-0.5" style={{ color: 'var(--color-fg-muted)' }}>{createdDate}</p>
+              {ownerEmail && (
+                <p className="text-xs mt-0.5 font-medium truncate max-w-[180px]" style={{ color: 'var(--color-primary)' }}>{ownerEmail}</p>
+              )}
             </div>
           </div>
           <div className="flex flex-col items-end gap-1.5">
@@ -225,12 +229,7 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
       >
         <button
           onClick={() => onViewDetails(app)}
-          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all"
-          style={{
-            color: 'var(--color-fg-muted)',
-            background: 'var(--color-bg-secondary)',
-            border: '1px solid var(--color-border)',
-          }}
+          className="btn-glass flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg"
         >
           <BarChart3 className="w-3 h-3" />
           Ver detalhes
@@ -240,12 +239,7 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
             href={panelUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all"
-            style={{
-              color: 'var(--color-primary)',
-              background: 'color-mix(in srgb, var(--color-primary) 8%, transparent)',
-              border: '1px solid color-mix(in srgb, var(--color-primary) 20%, transparent)',
-            }}
+            className="btn-glass-primary flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg"
           >
             <ExternalLink className="w-3 h-3" />
             Abrir painel
@@ -258,15 +252,13 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
             <button
               onClick={() => onDelete(app.id)}
               disabled={deleting}
-              className="text-xs font-medium px-2.5 py-1 rounded-lg transition-all disabled:opacity-50"
-              style={{ color: '#ef4444', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}
+              className="btn-glass-danger text-xs font-medium px-2.5 py-1 rounded-lg disabled:opacity-50"
             >
               {deleting ? "..." : "Sim"}
             </button>
             <button
               onClick={() => setConfirmDelete(false)}
-              className="text-xs font-medium px-2.5 py-1 rounded-lg transition-all"
-              style={{ color: 'var(--color-fg-muted)', background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}
+              className="btn-glass text-xs font-medium px-2.5 py-1 rounded-lg"
             >
               Não
             </button>
@@ -274,8 +266,7 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
         ) : (
           <button
             onClick={() => setConfirmDelete(true)}
-            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-all"
-            style={{ color: 'var(--color-fg-muted)', border: '1px solid transparent' }}
+            className="btn-glass-danger flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg"
           >
             <Trash2 className="w-3 h-3" />
             Deletar

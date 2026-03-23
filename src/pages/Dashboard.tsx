@@ -257,16 +257,14 @@ function ApplicationsSection({
         <div className="flex items-center gap-2">
           <button
             onClick={onRefresh}
-            className="p-2 rounded-xl transition-all"
-            style={{ color: 'var(--color-fg-muted)', border: '1px solid var(--color-border)', background: 'transparent' }}
+            className="btn-glass p-2 rounded-xl"
             title="Atualizar"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
           <button
             onClick={onOpenCreate}
-            className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl transition-all"
-            style={{ background: 'var(--color-primary)', color: 'var(--color-primary-fg)' }}
+            className="btn-glass-primary flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl"
           >
             <Plus className="w-4 h-4" />
             Criar aplicação
@@ -332,8 +330,7 @@ function EmptyState({ onOpenCreate }: { onOpenCreate: () => void }) {
       </p>
       <button
         onClick={onOpenCreate}
-        className="flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl transition-all"
-        style={{ background: 'var(--color-primary)', color: 'var(--color-primary-fg)' }}
+        className="btn-glass-primary flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl"
       >
         <Plus className="w-4 h-4" />
         Criar primeira aplicação

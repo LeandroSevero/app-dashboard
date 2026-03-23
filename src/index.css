@@ -88,6 +88,67 @@
   .animate-in {
     animation: fadeInScale 0.15s ease-out forwards;
   }
+
+  .btn-glass {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    background: var(--color-glass2);
+    border: 1px solid rgba(255,255,255,0.35);
+    color: var(--color-primary);
+    transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.5);
+  }
+
+  .btn-glass:hover {
+    background: var(--color-glass3);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.6);
+    transform: translateY(-1px);
+  }
+
+  .btn-glass:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+
+  .btn-glass-primary {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    background: color-mix(in srgb, var(--color-primary) 85%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-primary) 60%, rgba(255,255,255,0.4));
+    color: var(--color-primary-fg);
+    transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
+    box-shadow: 0 2px 12px color-mix(in srgb, var(--color-primary) 30%, transparent), inset 0 1px 0 rgba(255,255,255,0.2);
+  }
+
+  .btn-glass-primary:hover {
+    background: color-mix(in srgb, var(--color-primary) 95%, transparent);
+    box-shadow: 0 4px 20px color-mix(in srgb, var(--color-primary) 40%, transparent), inset 0 1px 0 rgba(255,255,255,0.25);
+    transform: translateY(-1px);
+  }
+
+  .btn-glass-primary:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 6px color-mix(in srgb, var(--color-primary) 20%, transparent);
+  }
+
+  .btn-glass-danger {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    background: rgba(239,68,68,0.1);
+    border: 1px solid rgba(239,68,68,0.25);
+    color: #ef4444;
+    transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
+  }
+
+  .btn-glass-danger:hover {
+    background: rgba(239,68,68,0.18);
+    box-shadow: 0 4px 16px rgba(239,68,68,0.15);
+    transform: translateY(-1px);
+  }
+
+  .btn-glass-danger:active {
+    transform: translateY(0);
+  }
 }
 
 @keyframes fadeInScale {

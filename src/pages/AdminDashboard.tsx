@@ -174,10 +174,11 @@ export default function AdminDashboard() {
           {activeSection === "applications" && (
             <MyApplicationsSection
               apps={myApps}
-              loading={myAppsLoading}
+              allAppsWithOwner={allApps}
+              loading={myAppsLoading || usersLoading}
               deletingId={deletingId}
               onDelete={handleMyAppDelete}
-              onRefresh={fetchMyApps}
+              onRefresh={() => { fetchMyApps(); if (!usersFetched) fetchUsers(); }}
               onOpenCreate={() => setShowCreateModal(true)}
               onViewDetails={setDetailApp}
               currentUserId={user?.id}
@@ -279,8 +280,7 @@ function AdminDashboardSection() {
         </div>
         <button
           onClick={fetchStats}
-          className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg transition-all"
-          style={{ color: 'var(--color-fg-muted)', border: '1px solid var(--color-border)' }}
+          className="btn-glass flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg"
         >
           <RefreshCw className="w-3 h-3" />
           Atualizar
@@ -392,6 +392,7 @@ function MiniChart({ title, data, color }: { title: string; data: Array<{ date: 
 
 interface MyApplicationsSectionProps {
   apps: Application[];
+  allAppsWithOwner: AppWithOwner[];
   loading: boolean;
   deletingId: string | null;
   onDelete: (id: string) => void;
@@ -401,12 +402,11 @@ interface MyApplicationsSectionProps {
   currentUserId?: string;
 }
 
-function MyApplicationsSection({ apps, loading, deletingId, onDelete, onRefresh, onOpenCreate, onViewDetails, currentUserId }: MyApplicationsSectionProps) {
+function MyApplicationsSection({ apps, allAppsWithOwner, loading, deletingId, onDelete, onRefresh, onOpenCreate, onViewDetails, currentUserId }: MyApplicationsSectionProps) {
   const [showAll, setShowAll] = useState(false);
 
-  const displayedApps = showAll || !currentUserId
-    ? apps
-    : apps.filter((a) => a.user_id === currentUserId);
+  const myOwnApps = currentUserId ? apps.filter((a) => a.user_id === currentUserId) : apps;
+  const displayedApps = showAll ? allAppsWithOwner : myOwnApps;
 
   return (
     <div className="space-y-6">
@@ -417,7 +417,7 @@ function MyApplicationsSection({ apps, loading, deletingId, onDelete, onRefresh,
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowAll(!showAll)}
+            onClick={() => { if (!showAll) onRefresh(); setShowAll(!showAll); }}
             className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl transition-all"
             style={showAll
               ? { background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 25%, transparent)' }
@@ -427,17 +427,17 @@ function MyApplicationsSection({ apps, loading, deletingId, onDelete, onRefresh,
             <LayoutGrid className="w-3.5 h-3.5" />
             {showAll ? "Somente minhas" : "Mostrar todas"}
           </button>
-          <button onClick={onRefresh} className="p-2 rounded-xl transition-all" style={{ color: 'var(--color-fg-muted)', border: '1px solid var(--color-border)' }}>
+          <button onClick={onRefresh} className="btn-glass p-2 rounded-xl">
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
-          <button onClick={onOpenCreate} className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl" style={{ background: 'var(--color-primary)', color: 'var(--color-primary-fg)' }}>
+          <button onClick={onOpenCreate} className="btn-glass-primary flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl">
             <Package className="w-4 h-4" />
             Criar
           </button>
         </div>
       </div>
 
-      {!showAll && currentUserId && apps.some((a) => a.user_id !== currentUserId) && (
+      {!showAll && currentUserId && allAppsWithOwner.some((a) => a.user_id !== currentUserId) && (
         <div
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs"
           style={{ background: 'color-mix(in srgb, var(--color-primary) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 15%, transparent)', color: 'var(--color-fg-muted)' }}
@@ -458,22 +458,26 @@ function MyApplicationsSection({ apps, loading, deletingId, onDelete, onRefresh,
           </div>
           <p className="font-semibold" style={{ color: 'var(--color-fg)' }}>Nenhuma aplicação</p>
           <p className="text-sm mt-1 mb-5" style={{ color: 'var(--color-fg-muted)' }}>Crie sua primeira instância.</p>
-          <button onClick={onOpenCreate} className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl" style={{ background: 'var(--color-primary)', color: 'var(--color-primary-fg)' }}>
+          <button onClick={onOpenCreate} className="btn-glass-primary flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl">
             <Package className="w-4 h-4" />
             Criar aplicação
           </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {displayedApps.map((app) => (
-            <ApplicationCard
-              key={app.id}
-              app={app}
-              onDelete={onDelete}
-              deleting={deletingId === app.id}
-              onViewDetails={onViewDetails}
-            />
-          ))}
+          {displayedApps.map((app) => {
+            const ownerEmail = showAll && 'userEmail' in app ? (app as AppWithOwner).userEmail : undefined;
+            return (
+              <ApplicationCard
+                key={app.id}
+                app={app}
+                onDelete={onDelete}
+                deleting={deletingId === app.id}
+                onViewDetails={onViewDetails}
+                ownerEmail={ownerEmail}
+              />
+            );
+          })}
         </div>
       )}
     </div>
@@ -512,7 +516,7 @@ function UsersTab({ users, loading, onRefresh, onUserUpdated, onUserDeleted }: U
           <h1 className="text-2xl font-bold" style={{ color: 'var(--color-fg)' }}>Usuários</h1>
           <p className="text-sm mt-1" style={{ color: 'var(--color-fg-muted)' }}>Gerencie todos os usuários da plataforma.</p>
         </div>
-        <button onClick={onRefresh} className="p-2 rounded-xl transition-all" style={{ color: 'var(--color-fg-muted)', border: '1px solid var(--color-border)' }} title="Atualizar">
+        <button onClick={onRefresh} className="btn-glass p-2 rounded-xl" title="Atualizar">
           <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
         </button>
       </div>
@@ -780,7 +784,7 @@ function ApplicationsTab({ apps, loading, onRefresh, onAppUpdated, onAppDeleted 
           <h1 className="text-2xl font-bold" style={{ color: 'var(--color-fg)' }}>Aplicações Globais</h1>
           <p className="text-sm mt-1" style={{ color: 'var(--color-fg-muted)' }}>Todas as instâncias da plataforma.</p>
         </div>
-        <button onClick={onRefresh} className="p-2 rounded-xl transition-all" style={{ color: 'var(--color-fg-muted)', border: '1px solid var(--color-border)' }} title="Atualizar">
+        <button onClick={onRefresh} className="btn-glass p-2 rounded-xl" title="Atualizar">
           <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
         </button>
       </div>
@@ -876,7 +880,7 @@ function ResourcesTab({ apps, loading, onRefresh }: ResourcesTabProps) {
           <h1 className="text-2xl font-bold" style={{ color: 'var(--color-fg)' }}>Recursos</h1>
           <p className="text-sm mt-1" style={{ color: 'var(--color-fg-muted)' }}>Visão dos recursos de infraestrutura alocados.</p>
         </div>
-        <button onClick={onRefresh} className="p-2 rounded-xl transition-all" style={{ color: 'var(--color-fg-muted)', border: '1px solid var(--color-border)' }} title="Atualizar">
+        <button onClick={onRefresh} className="btn-glass p-2 rounded-xl" title="Atualizar">
           <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
         </button>
       </div>
@@ -1050,7 +1054,7 @@ function LogsTab() {
           <h1 className="text-2xl font-bold" style={{ color: 'var(--color-fg)' }}>Logs</h1>
           <p className="text-sm mt-1" style={{ color: 'var(--color-fg-muted)' }}>Eventos recentes da plataforma.</p>
         </div>
-        <button onClick={() => fetchLogs(typeFilter || undefined)} className="p-2 rounded-xl transition-all" style={{ color: 'var(--color-fg-muted)', border: '1px solid var(--color-border)' }} title="Atualizar">
+        <button onClick={() => fetchLogs(typeFilter || undefined)} className="btn-glass p-2 rounded-xl" title="Atualizar">
           <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
         </button>
       </div>
