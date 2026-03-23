@@ -90,6 +90,7 @@ export async function deleteUser(userId: string): Promise<ApiResponse> {
     const { data, error } = await invokeWithAuth("delete-user", { userId });
     if (error) return { success: false, error: error.message };
     if ((data as Record<string, unknown>)?.error) return { success: false, error: (data as Record<string, unknown>).error as string };
+    logEvent("delete", undefined, { deleted_user_id: userId, admin_action: true });
     return { success: true };
   } catch {
     return { success: false, error: "Erro de conexão" };

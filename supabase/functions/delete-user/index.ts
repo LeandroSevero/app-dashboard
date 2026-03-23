@@ -68,8 +68,36 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    const { data: { user: targetUser }, error: fetchError } = await supabase.auth.admin.getUserById(userId);
+    if (fetchError || !targetUser) {
+      return new Response(JSON.stringify({ error: "Usuário não encontrado" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const deletedAt = new Date().toISOString();
+
+    // Step 1: Mark profile as deleted and preserve email before auth hard-delete
+    await supabase
+      .from("profiles")
+      .upsert({
+        id: userId,
+        email: targetUser.email ?? "",
+        deleted_at: deletedAt,
+      }, { onConflict: "id" });
+
+    // Step 2: Hard-delete from auth.users (profile FK was dropped so row survives)
     const { error: deleteError } = await supabase.auth.admin.deleteUser(userId);
     if (deleteError) throw deleteError;
+
+    // Step 3: Log the deletion event
+    await supabase.from("app_events").insert({
+      user_id: user.id,
+      application_id: null,
+      event_type: "delete",
+      meta: { deleted_user_id: userId, deleted_user_email: targetUser.email, admin_action: true },
+    });
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
