@@ -23,6 +23,7 @@ function mapRow(row: Record<string, unknown>): Application {
     mongo_db: (row.mongo_db as string) || undefined,
     mongo_user: (row.mongo_user as string) || undefined,
     mongo_password: (row.mongo_password as string) || undefined,
+    mongo_collection: (row.mongo_collection as string) || undefined,
     connection_url: (row.connection_url as string) || undefined,
     expires_at: (row.expires_at as string | null) ?? null,
   };

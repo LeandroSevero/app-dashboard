@@ -17,6 +17,7 @@ export interface Application {
   mongo_db?: string;
   mongo_user?: string;
   mongo_password?: string;
+  mongo_collection?: string;
   connection_url?: string;
   expires_at?: string | null;
 }

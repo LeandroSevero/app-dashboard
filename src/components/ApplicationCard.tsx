@@ -87,10 +87,10 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
 
   return (
     <div
-      className="rounded-2xl transition-all duration-200"
+      className="rounded-2xl transition-all duration-200 flex flex-col"
       style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}
     >
-      <div className="p-5">
+      <div className="p-5 flex flex-col flex-1">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
             <div
@@ -140,9 +140,9 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
         </div>
 
         {app.type === "mongodb" ? (
-          <div className="mb-3">
+          <div className="flex-1 flex flex-col">
             <p className="text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--color-fg-muted)' }}>Conexão</p>
-            <div className="space-y-2">
+            <div className="space-y-2 flex-1">
               <PasswordRow
                 label="Connection"
                 value={app.connection_url || ""}
@@ -153,6 +153,9 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
                 onCopy={copyToClipboard}
               />
               <CredentialRow label="Database" value={app.mongo_db || ""} field="mongo_db" copiedField={copiedField} onCopy={copyToClipboard} />
+              {app.mongo_collection && (
+                <CredentialRow label="Collection" value={app.mongo_collection} field="mongo_collection" copiedField={copiedField} onCopy={copyToClipboard} />
+              )}
               <CredentialRow label="Usuário" value={app.mongo_user || ""} field="mongo_user" copiedField={copiedField} onCopy={copyToClipboard} />
               <PasswordRow
                 label="Senha"

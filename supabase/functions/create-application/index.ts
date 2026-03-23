@@ -155,13 +155,6 @@ interface AmqpInstanceDetails {
   cloudamqpId: string;
 }
 
-interface MongoInstanceDetails {
-  connectionUrl: string;
-  dbName: string;
-  dbUser: string;
-  dbPassword: string;
-}
-
 async function getClusterHostname(): Promise<string> {
   try {
     const data = await atlasGet(`/groups/${ATLAS_PROJECT_ID}/clusters/${ATLAS_CLUSTER_NAME}`) as { connectionStrings?: { standardSrv?: string } };
@@ -176,11 +169,20 @@ async function getClusterHostname(): Promise<string> {
   return "aplicacoes-mongodb.eo9pc4t.mongodb.net";
 }
 
+interface MongoInstanceDetails {
+  connectionUrl: string;
+  dbName: string;
+  dbUser: string;
+  dbPassword: string;
+  collectionName: string;
+}
+
 async function provisionMongoInstance(userId: string): Promise<MongoInstanceDetails> {
   const shortId = userId.replace(/-/g, "").substring(0, 12);
   const dbName = `app_${shortId}`;
   const dbUser = `user_${shortId}`;
   const dbPassword = generateSecurePassword(24);
+  const collectionName = dbName;
 
   await atlasPost(`/groups/${ATLAS_PROJECT_ID}/databaseUsers`, {
     databaseName: "admin",
@@ -197,7 +199,7 @@ async function provisionMongoInstance(userId: string): Promise<MongoInstanceDeta
   const clusterHost = await getClusterHostname();
   const connectionUrl = `mongodb+srv://${dbUser}:${encodeURIComponent(dbPassword)}@${clusterHost}/${dbName}?retryWrites=true&w=majority`;
 
-  return { connectionUrl, dbName, dbUser, dbPassword };
+  return { connectionUrl, dbName, dbUser, dbPassword, collectionName };
 }
 
 async function provisionAmqpInstance(name: string, type: string): Promise<AmqpInstanceDetails> {
@@ -358,6 +360,7 @@ Deno.serve(async (req: Request) => {
         mongo_db: mongo.dbName,
         mongo_user: mongo.dbUser,
         mongo_password: mongo.dbPassword,
+        mongo_collection: mongo.collectionName,
         connection_url: mongo.connectionUrl,
         expires_at: expiresAt,
         created_at: now,
@@ -380,6 +383,7 @@ Deno.serve(async (req: Request) => {
         mongo_db: mongo.dbName,
         mongo_user: mongo.dbUser,
         mongo_password: mongo.dbPassword,
+        mongo_collection: mongo.collectionName,
         connection_url: mongo.connectionUrl,
         amqp_url: "",
         cloudamqp_id: "",
