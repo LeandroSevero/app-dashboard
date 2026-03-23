@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { default as md5sync } from "npm:md5@2.3.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,11 +16,8 @@ const ATLAS_PRIVATE_KEY = (Deno.env.get("Private_Key") || "").trim();
 const ATLAS_PROJECT_ID = (Deno.env.get("Project_ID") || "").trim();
 const ATLAS_BASE_URL = "https://cloud.mongodb.com/api/atlas/v2";
 
-async function md5(message: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(message);
-  const hashBuffer = await crypto.subtle.digest("MD5", data);
-  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, "0")).join("");
+function md5(message: string): string {
+  return md5sync(message);
 }
 
 async function digestAuth(method: string, url: string, body?: unknown): Promise<Response> {
@@ -45,17 +43,17 @@ async function digestAuth(method: string, url: string, body?: unknown): Promise<
   const cnonce = Array.from(crypto.getRandomValues(new Uint8Array(8))).map(b => b.toString(16).padStart(2, "0")).join("");
   const uri = new URL(url).pathname + new URL(url).search;
 
-  const ha1 = await md5(`${ATLAS_PUBLIC_KEY}:${realm}:${ATLAS_PRIVATE_KEY}`);
-  const ha2 = await md5(`${method}:${uri}`);
+  const ha1 = md5(`${ATLAS_PUBLIC_KEY}:${realm}:${ATLAS_PRIVATE_KEY}`);
+  const ha2 = md5(`${method}:${uri}`);
 
   let response: string;
   let authHeader: string;
 
   if (qop === "auth") {
-    response = await md5(`${ha1}:${nonce}:${nc}:${cnonce}:${qop}:${ha2}`);
+    response = md5(`${ha1}:${nonce}:${nc}:${cnonce}:${qop}:${ha2}`);
     authHeader = `Digest username="${ATLAS_PUBLIC_KEY}", realm="${realm}", nonce="${nonce}", uri="${uri}", qop=${qop}, nc=${nc}, cnonce="${cnonce}", response="${response}"`;
   } else {
-    response = await md5(`${ha1}:${nonce}:${ha2}`);
+    response = md5(`${ha1}:${nonce}:${ha2}`);
     authHeader = `Digest username="${ATLAS_PUBLIC_KEY}", realm="${realm}", nonce="${nonce}", uri="${uri}", response="${response}"`;
   }
 
