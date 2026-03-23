@@ -187,7 +187,7 @@ export default function AdminDashboard() {
   }
 
   const allApps: (Application & { userEmail: string; userId: string })[] = users.flatMap((u) =>
-    u.applications.map((a) => ({ ...a, userEmail: u.email, userId: u.id }))
+    u.applications.filter((a) => !a.deleted_at).map((a) => ({ ...a, userEmail: u.email, userId: u.id }))
   );
 
   return (

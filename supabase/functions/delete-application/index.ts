@@ -156,7 +156,7 @@ Deno.serve(async (req: Request) => {
 
     let query = supabase
       .from("applications")
-      .select("id, type, cloudamqp_id, mongo_user, mongo_db, user_id")
+      .select("id, name, type, cloudamqp_id, mongo_user, mongo_db, user_id")
       .eq("id", appId)
       .is("deleted_at", null);
     if (!isAdmin) query = query.eq("user_id", user.id);
@@ -173,6 +173,13 @@ Deno.serve(async (req: Request) => {
       .from("applications")
       .update({ deleted_at: new Date().toISOString() })
       .eq("id", appId);
+
+    await supabase.from("app_events").insert({
+      user_id: app.user_id,
+      application_id: appId,
+      event_type: "delete",
+      meta: { name: app.name, type: app.type },
+    });
 
     const cleanup = async () => {
       if (app.type === "mongodb") {
