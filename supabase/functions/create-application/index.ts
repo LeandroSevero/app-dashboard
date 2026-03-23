@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { default as md5sync } from "npm:md5@2.3.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -98,10 +99,7 @@ async function digestAuth(method: string, url: string, body?: unknown): Promise<
 }
 
 async function md5(message: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(message);
-  const hashBuffer = await crypto.subtle.digest("MD5", data);
-  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, "0")).join("");
+  return md5sync(message);
 }
 
 async function atlasGet(path: string): Promise<unknown> {
