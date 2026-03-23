@@ -856,10 +856,13 @@ interface ApplicationsTabProps {
   onTypeFilterConsumed?: () => void;
 }
 
+type DeletedFilter = "all" | "active" | "deleted";
+
 function ApplicationsTab({ apps, loading, onRefresh, onAppUpdated, onAppDeleted, initialTypeFilter, onTypeFilterConsumed }: ApplicationsTabProps) {
   const [userFilter, setUserFilter] = useState("");
   const [appFilter, setAppFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState(initialTypeFilter ?? "");
+  const [deletedFilter, setDeletedFilter] = useState<DeletedFilter>("active");
 
   useEffect(() => {
     if (initialTypeFilter !== undefined && initialTypeFilter !== typeFilter) {
@@ -872,10 +875,22 @@ function ApplicationsTab({ apps, loading, onRefresh, onAppUpdated, onAppDeleted,
     const matchUser = a.userEmail.toLowerCase().includes(userFilter.toLowerCase());
     const matchApp = a.name.toLowerCase().includes(appFilter.toLowerCase());
     const matchType = typeFilter ? a.type === typeFilter : true;
-    return matchUser && matchApp && matchType;
+    const isDeleted = !!a.deleted_at;
+    const matchDeleted =
+      deletedFilter === "all" ? true :
+      deletedFilter === "deleted" ? isDeleted :
+      !isDeleted;
+    return matchUser && matchApp && matchType && matchDeleted;
   });
 
   const uniqueUsers = Array.from(new Set(apps.map((a) => a.userEmail))).sort();
+  const hasActiveFilters = !!(userFilter || appFilter || typeFilter || deletedFilter !== "active");
+
+  const deletedFilterOptions: { value: DeletedFilter; label: string }[] = [
+    { value: "active", label: "Somente ativas" },
+    { value: "all", label: "Ativas + excluídas" },
+    { value: "deleted", label: "Somente excluídas" },
+  ];
 
   return (
     <div className="space-y-4">
@@ -891,9 +906,26 @@ function ApplicationsTab({ apps, loading, onRefresh, onAppUpdated, onAppDeleted,
 
       <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
         <div className="px-6 py-4 space-y-3" style={{ background: 'var(--color-card)', borderBottom: '1px solid var(--color-border)' }}>
-          <div className="flex items-center gap-2">
-            <Boxes className="w-4 h-4" style={{ color: 'var(--color-fg-muted)' }} />
-            <h2 className="font-semibold text-sm" style={{ color: 'var(--color-fg)' }}>Aplicações ({filtered.length})</h2>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Boxes className="w-4 h-4" style={{ color: 'var(--color-fg-muted)' }} />
+              <h2 className="font-semibold text-sm" style={{ color: 'var(--color-fg)' }}>Aplicações ({filtered.length})</h2>
+            </div>
+            <div className="flex items-center gap-1 p-0.5 rounded-lg" style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}>
+              {deletedFilterOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setDeletedFilter(opt.value)}
+                  className="px-2.5 py-1 rounded-md text-xs font-medium transition-all"
+                  style={deletedFilter === opt.value
+                    ? { background: opt.value === 'deleted' ? 'rgba(239,68,68,0.15)' : 'color-mix(in srgb, var(--color-primary) 15%, transparent)', color: opt.value === 'deleted' ? '#ef4444' : 'var(--color-primary)' }
+                    : { color: 'var(--color-fg-muted)', background: 'transparent' }
+                  }
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -911,8 +943,8 @@ function ApplicationsTab({ apps, loading, onRefresh, onAppUpdated, onAppDeleted,
               <option value="lavinmq">LavinMQ</option>
               <option value="mongodb">MongoDB</option>
             </select>
-            {(userFilter || appFilter || typeFilter) && (
-              <button onClick={() => { setUserFilter(""); setAppFilter(""); setTypeFilter(""); }} className="px-3 py-1.5 rounded-lg text-xs" style={{ color: 'var(--color-fg-muted)', border: '1px solid var(--color-border)' }}>Limpar</button>
+            {hasActiveFilters && (
+              <button onClick={() => { setUserFilter(""); setAppFilter(""); setTypeFilter(""); setDeletedFilter("active"); }} className="px-3 py-1.5 rounded-lg text-xs" style={{ color: 'var(--color-fg-muted)', border: '1px solid var(--color-border)' }}>Limpar</button>
             )}
           </div>
 
@@ -944,7 +976,7 @@ function ApplicationsTab({ apps, loading, onRefresh, onAppUpdated, onAppDeleted,
           <div style={{ background: 'var(--color-card)' }}>
             {filtered.map((app, idx) => (
               <div key={app.id} style={{ borderTop: idx === 0 ? 'none' : '1px solid var(--color-border)' }}>
-                <AdminAppRow app={app} onUpdated={(updates) => onAppUpdated(app.id, updates)} onDeleted={() => onAppDeleted(app.id)} />
+                <AdminAppRow app={app} onUpdated={(updates) => onAppUpdated(app.id, updates)} onDeleted={() => onAppDeleted(app.id)} showDeletedAt={deletedFilter !== "active"} />
               </div>
             ))}
           </div>
@@ -1253,9 +1285,10 @@ interface AdminAppRowProps {
   app: AppWithOwner;
   onUpdated: (updates: Partial<Application>) => void;
   onDeleted: () => void;
+  showDeletedAt?: boolean;
 }
 
-function AdminAppRow({ app, onUpdated, onDeleted }: AdminAppRowProps) {
+function AdminAppRow({ app, onUpdated, onDeleted, showDeletedAt }: AdminAppRowProps) {
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState(app.name);
   const [savingRename, setSavingRename] = useState(false);
@@ -1336,15 +1369,30 @@ function AdminAppRow({ app, onUpdated, onDeleted }: AdminAppRowProps) {
             </div>
           ) : (
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-semibold" style={{ color: 'var(--color-fg)' }}>{app.name}</span>
+              <span className="text-sm font-semibold" style={{ color: app.deleted_at ? 'var(--color-fg-muted)' : 'var(--color-fg)' }}>{app.name}</span>
               <span className="text-xs px-1.5 py-0.5 rounded-md flex-shrink-0" style={{ color: typeColor.color, background: typeColor.bg, border: `1px solid ${typeColor.border}` }}>
                 {app.type === "lavinmq" ? "LavinMQ" : app.type === "mongodb" ? "MongoDB" : "RabbitMQ"}
               </span>
+              {app.deleted_at && (
+                <span className="text-xs px-1.5 py-0.5 rounded-md flex-shrink-0 font-medium" style={{ color: '#ef4444', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                  Excluída
+                </span>
+              )}
             </div>
           )}
           {renameError && <p className="text-xs mt-0.5" style={{ color: '#ef4444' }}>{renameError}</p>}
-          <div className="flex items-center gap-2 mt-0.5">
-            <p className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>{new Date(app.created_at).toLocaleDateString("pt-BR")}</p>
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            <p className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>
+              Criado: {new Date(app.created_at).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric' })}
+            </p>
+            {showDeletedAt && app.deleted_at && (
+              <>
+                <span className="text-xs" style={{ color: 'var(--color-border)' }}>·</span>
+                <p className="text-xs font-medium" style={{ color: '#ef4444' }}>
+                  Excluído: {new Date(app.deleted_at).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                </p>
+              </>
+            )}
             <span className="text-xs" style={{ color: 'var(--color-border)' }}>·</span>
             <p className="text-xs truncate" style={{ color: 'var(--color-fg-muted)' }}>{app.userEmail}</p>
           </div>

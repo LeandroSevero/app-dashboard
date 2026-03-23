@@ -60,8 +60,7 @@ Deno.serve(async (req: Request) => {
       const { data: profiles } = await supabase.from("profiles").select("*");
       const { data: apps } = await supabase
         .from("applications")
-        .select("*")
-        .is("deleted_at", null);
+        .select("*");
 
       const appsByUser = new Map<string, unknown[]>();
       for (const app of apps || []) {
@@ -91,8 +90,7 @@ Deno.serve(async (req: Request) => {
     const { data: profiles } = await supabase.from("profiles").select("*");
     const { data: apps } = await supabase
       .from("applications")
-      .select("*")
-      .is("deleted_at", null);
+      .select("*");
 
     const profilesMap = new Map((profiles || []).map((p) => [p.id, p]));
     const appsByUser = new Map<string, unknown[]>();
@@ -141,6 +139,7 @@ function mapApp(app: Record<string, unknown>) {
     cloudamqp_id: app.cloudamqp_id || "",
     panel_url: app.panel_url || "",
     created_at: app.created_at,
+    deleted_at: app.deleted_at || null,
     mqtt_hostname: app.mqtt_host,
     mqtt_username: app.mqtt_user,
     mqtt_password: app.mqtt_password,
@@ -149,6 +148,7 @@ function mapApp(app: Record<string, unknown>) {
     mongo_db: app.mongo_db,
     mongo_user: app.mongo_user,
     mongo_password: app.mongo_password,
+    mongo_collection: app.mongo_collection,
     connection_url: app.connection_url,
   };
 }

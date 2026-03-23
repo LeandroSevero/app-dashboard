@@ -20,6 +20,7 @@ export interface Application {
   mongo_collection?: string;
   connection_url?: string;
   expires_at?: string | null;
+  deleted_at?: string | null;
 }
 
 export interface UserProfile {

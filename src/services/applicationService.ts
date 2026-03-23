@@ -26,6 +26,7 @@ function mapRow(row: Record<string, unknown>): Application {
     mongo_collection: (row.mongo_collection as string) || undefined,
     connection_url: (row.connection_url as string) || undefined,
     expires_at: (row.expires_at as string | null) ?? null,
+    deleted_at: (row.deleted_at as string | null) ?? null,
   };
 }
 
