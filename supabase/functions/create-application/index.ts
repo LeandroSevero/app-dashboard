@@ -11,11 +11,11 @@ const corsHeaders = {
 const CLOUDAMQP_API_KEY = Deno.env.get("CLOUDAMQP_API_KEY") || "";
 const CLOUDAMQP_BASE_URL = "https://customer.cloudamqp.com/api";
 
-const ATLAS_PUBLIC_KEY = Deno.env.get("Public_Key") || "";
-const ATLAS_PRIVATE_KEY = Deno.env.get("Private_Key") || "";
-const ATLAS_PROJECT_ID = Deno.env.get("Project_ID") || "";
+const ATLAS_PUBLIC_KEY = (Deno.env.get("Public_Key") || "").trim();
+const ATLAS_PRIVATE_KEY = (Deno.env.get("Private_Key") || "").trim();
+const ATLAS_PROJECT_ID = (Deno.env.get("Project_ID") || "").trim();
 const ATLAS_BASE_URL = "https://cloud.mongodb.com/api/atlas/v2";
-const ATLAS_CLUSTER_NAME = Deno.env.get("ATLAS_CLUSTER_NAME") || "aplicacoes-mongodb";
+const ATLAS_CLUSTER_NAME = (Deno.env.get("ATLAS_CLUSTER_NAME") || "aplicacoes-mongodb").trim();
 
 const PLAN_MAP: Record<string, string> = {
   rabbitmq: "lemur",
