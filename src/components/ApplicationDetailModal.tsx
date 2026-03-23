@@ -44,25 +44,25 @@ interface ApplicationDetailModalProps {
 }
 
 const RABBITMQ_LIMITS = {
-  connections: { max: 20, label: "Open Connections" },
-  queues: { max: 150, label: "Queues" },
-  messages: { max: 1_000_000, label: "Messages" },
-  queue_length: { max: 10_000, label: "Queue Length" },
-  idle_days: { max: 28, label: "Max Idle Queue Time", unit: "days" },
-  max_queue_size: { label: "Max queue size", value: "1 GB" },
+  connections: { max: 20, label: "Conexões abertas" },
+  queues: { max: 150, label: "Filas" },
+  messages: { max: 1_000_000, label: "Mensagens" },
+  queue_length: { max: 10_000, label: "Tamanho máx. da fila" },
+  idle_days: { max: 28, label: "Tempo máx. de inatividade", unit: "dias" },
+  max_queue_size: { label: "Tamanho máx. por fila", value: "1 GB" },
 };
 
 const LAVINMQ_LIMITS = {
-  connections: { max: 40, label: "Open Connections" },
-  queues: { max: 300, label: "Queues" },
-  messages: { max: 2_000_000, label: "Messages" },
-  queue_length: { max: 20_000, label: "Queue Length" },
-  max_queue_size: { label: "Max queue size", value: "1 GB" },
+  connections: { max: 40, label: "Conexões abertas" },
+  queues: { max: 300, label: "Filas" },
+  messages: { max: 2_000_000, label: "Mensagens" },
+  queue_length: { max: 20_000, label: "Tamanho máx. da fila" },
+  max_queue_size: { label: "Tamanho máx. por fila", value: "1 GB" },
 };
 
 const MONGODB_LIMITS = {
   storage: { max: 20, label: "Armazenamento", unit: "MB" },
-  collections: { max: 100, label: "Collections" },
+  collections: { max: 100, label: "Coleções" },
   connections: { max: 500, label: "Conexões simultâneas" },
 };
 
@@ -203,7 +203,7 @@ function MongoGuide({ app }: { app: Application }) {
           </div>
           <div className="flex items-center gap-2 text-xs" style={{ color: "var(--color-fg-muted)" }}>
             <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0" style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e" }}>2</span>
-            Navegue até <span className="font-semibold" style={{ color: "var(--color-fg)" }}>Collections</span> no cluster
+            Navegue até <span className="font-semibold" style={{ color: "var(--color-fg)" }}>Coleções</span> no cluster
           </div>
           <div className="flex items-center gap-2 text-xs" style={{ color: "var(--color-fg-muted)" }}>
             <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0" style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e" }}>3</span>
@@ -806,7 +806,7 @@ export default function ApplicationDetailModal({ app, onClose }: ApplicationDeta
               <div className="rounded-xl px-4 py-3 flex items-center justify-between" style={{ background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.15)" }}>
                 <div className="flex items-center gap-2">
                   <MessageSquare className="w-4 h-4" style={{ color: "#f59e0b" }} />
-                  <span className="text-sm font-medium" style={{ color: "var(--color-fg)" }}>Queued messages</span>
+                  <span className="text-sm font-medium" style={{ color: "var(--color-fg)" }}>Mensagens em fila</span>
                 </div>
                 <span className="text-lg font-bold font-mono" style={{ color: "#f59e0b" }}>{loadingStats && !stats ? "—" : formatNumber(totalMessages)}</span>
               </div>
@@ -835,7 +835,7 @@ export default function ApplicationDetailModal({ app, onClose }: ApplicationDeta
               <div className="rounded-xl px-4 py-3 flex items-center justify-between" style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.15)" }}>
                 <div className="flex items-center gap-2">
                   <Database className="w-4 h-4" style={{ color: "#22c55e" }} />
-                  <span className="text-sm font-medium" style={{ color: "var(--color-fg)" }}>Database</span>
+                  <span className="text-sm font-medium" style={{ color: "var(--color-fg)" }}>Banco de dados</span>
                 </div>
                 <span className="text-sm font-mono font-semibold" style={{ color: "#22c55e" }}>{app.mongo_db || "—"}</span>
               </div>
@@ -843,7 +843,7 @@ export default function ApplicationDetailModal({ app, onClose }: ApplicationDeta
               <div className="rounded-xl px-4 py-3 flex items-center justify-between" style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.15)" }}>
                 <div className="flex items-center gap-2">
                   <Table className="w-4 h-4" style={{ color: "#22c55e" }} />
-                  <span className="text-sm font-medium" style={{ color: "var(--color-fg)" }}>Collection padrão</span>
+                  <span className="text-sm font-medium" style={{ color: "var(--color-fg)" }}>Coleção padrão</span>
                 </div>
                 <span className="text-sm font-mono font-semibold" style={{ color: "#22c55e" }}>{app.mongo_collection || app.mongo_db || "—"}</span>
               </div>
@@ -924,10 +924,10 @@ export default function ApplicationDetailModal({ app, onClose }: ApplicationDeta
             <div className="p-5 space-y-4">
               <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-fg-muted)" }}>Conexão</p>
               <div className="space-y-2">
-                <PassRow label="Connection String" value={app.connection_url || ""} field="connurl" show={showPassword} onToggle={() => setShowPassword(!showPassword)} copiedField={copiedField} onCopy={copyToClipboard} />
-                <CredRow label="Database" value={app.mongo_db || ""} field="mongodb" copiedField={copiedField} onCopy={copyToClipboard} />
+                <PassRow label="String de conexão" value={app.connection_url || ""} field="connurl" show={showPassword} onToggle={() => setShowPassword(!showPassword)} copiedField={copiedField} onCopy={copyToClipboard} />
+                <CredRow label="Banco" value={app.mongo_db || ""} field="mongodb" copiedField={copiedField} onCopy={copyToClipboard} />
                 {app.mongo_collection && (
-                  <CredRow label="Collection" value={app.mongo_collection} field="mongocoll" copiedField={copiedField} onCopy={copyToClipboard} />
+                  <CredRow label="Coleção" value={app.mongo_collection} field="mongocoll" copiedField={copiedField} onCopy={copyToClipboard} />
                 )}
                 <CredRow label="Usuário" value={app.mongo_user || ""} field="mongouser" copiedField={copiedField} onCopy={copyToClipboard} />
                 <PassRow label="Senha" value={app.mongo_password || ""} field="mongopass" show={showMqttPassword} onToggle={() => setShowMqttPassword(!showMqttPassword)} copiedField={copiedField} onCopy={copyToClipboard} />

@@ -1111,25 +1111,25 @@ const APP_TYPE_CONFIG = {
 };
 
 const RABBITMQ_RES_LIMITS = {
-  connections: { max: 20, label: "Open Connections" },
-  queues: { max: 150, label: "Queues" },
-  messages: { max: 1_000_000, label: "Messages" },
-  queue_length: { max: 10_000, label: "Queue Length" },
-  idle_days: { max: 28, label: "Max Idle Queue Time", unit: "days" },
-  max_queue_size: { label: "Max queue size", value: "1 GB" },
+  connections: { max: 20, label: "Conexões abertas" },
+  queues: { max: 150, label: "Filas" },
+  messages: { max: 1_000_000, label: "Mensagens" },
+  queue_length: { max: 10_000, label: "Tamanho máx. da fila" },
+  idle_days: { max: 28, label: "Tempo máx. de inatividade", unit: "dias" },
+  max_queue_size: { label: "Tamanho máx. por fila", value: "1 GB" },
 };
 
 const LAVINMQ_RES_LIMITS = {
-  connections: { max: 40, label: "Open Connections" },
-  queues: { max: 300, label: "Queues" },
-  messages: { max: 2_000_000, label: "Messages" },
-  queue_length: { max: 20_000, label: "Queue Length" },
-  max_queue_size: { label: "Max queue size", value: "1 GB" },
+  connections: { max: 40, label: "Conexões abertas" },
+  queues: { max: 300, label: "Filas" },
+  messages: { max: 2_000_000, label: "Mensagens" },
+  queue_length: { max: 20_000, label: "Tamanho máx. da fila" },
+  max_queue_size: { label: "Tamanho máx. por fila", value: "1 GB" },
 };
 
 const MONGODB_RES_LIMITS = {
   storage: { max: 20, label: "Armazenamento", displayMax: "20.00 MB" },
-  collections: { max: 100, label: "Collections" },
+  collections: { max: 100, label: "Coleções" },
   connections: { max: 500, label: "Conexões simultâneas" },
 };
 
@@ -1744,8 +1744,8 @@ function AdminAppRow({ app, onUpdated, onDeleted, showDeletedAt }: AdminAppRowPr
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--color-fg-muted)' }}>Conexão</p>
               <div className="space-y-2">
-                <CredRow label="Connection String" value={app.connection_url || ""} secret />
-                <CredRow label="Database" value={app.mongo_db || ""} />
+                <CredRow label="String de conexão" value={app.connection_url || ""} secret />
+                <CredRow label="Banco" value={app.mongo_db || ""} />
                 <CredRow label="Usuário" value={app.mongo_user || ""} />
                 <CredRow label="Senha" value={app.mongo_password || ""} secret />
               </div>
