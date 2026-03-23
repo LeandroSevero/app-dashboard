@@ -60,7 +60,7 @@ const LAVINMQ_LIMITS = {
 };
 
 const MONGODB_LIMITS = {
-  storage: { max: 512, label: "Armazenamento", unit: "MB" },
+  storage: { max: 20, label: "Armazenamento", unit: "MB" },
   collections: { max: 100, label: "Collections" },
   connections: { max: 500, label: "Conexões simultâneas" },
 };
@@ -796,7 +796,7 @@ export default function ApplicationDetailModal({ app, onClose }: ApplicationDeta
                   max={MONGODB_LIMITS.storage.max}
                   label={MONGODB_LIMITS.storage.label}
                   displayValue={formatBytes(0)}
-                  displayMax="512.00 MB"
+                  displayMax="20.00 MB"
                 />
                 <LimitBar value={1} max={MONGODB_LIMITS.collections.max} label={MONGODB_LIMITS.collections.label} />
                 <LimitBar value={0} max={MONGODB_LIMITS.connections.max} label={MONGODB_LIMITS.connections.label} />
