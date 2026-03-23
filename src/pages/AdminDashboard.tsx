@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Users,
   Server,
@@ -29,6 +29,7 @@ import {
   Clock,
   Filter,
   LayoutGrid,
+  ChevronDown,
 } from "lucide-react";
 import Header from "../components/Header";
 import Sidebar from "../components/Sidebar";
@@ -186,9 +187,11 @@ export default function AdminDashboard() {
     setDeletingId(null);
   }
 
-  const allApps: (Application & { userEmail: string; userId: string })[] = users.flatMap((u) =>
-    u.applications.filter((a) => !a.deleted_at).map((a) => ({ ...a, userEmail: u.email, userId: u.id }))
+  const allAppsWithDeleted: (Application & { userEmail: string; userId: string })[] = users.flatMap((u) =>
+    u.applications.map((a) => ({ ...a, userEmail: u.email, userId: u.id }))
   );
+
+  const allApps: (Application & { userEmail: string; userId: string })[] = allAppsWithDeleted.filter((a) => !a.deleted_at);
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-bg)', color: 'var(--color-fg)' }}>
@@ -247,7 +250,7 @@ export default function AdminDashboard() {
 
           {activeSection === "admin-apps" && (
             <ApplicationsTab
-              apps={allApps}
+              apps={allAppsWithDeleted}
               loading={usersLoading}
               onRefresh={fetchUsers}
               onAppUpdated={handleAppUpdated}
@@ -975,6 +978,18 @@ function ApplicationsTab({ apps, loading, onRefresh, onAppUpdated, onAppDeleted,
   const [appFilter, setAppFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState(initialTypeFilter ?? "");
   const [deletedFilter, setDeletedFilter] = useState<DeletedFilter>("active");
+  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
+  const typeDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (typeDropdownRef.current && !typeDropdownRef.current.contains(e.target as Node)) {
+        setTypeDropdownOpen(false);
+      }
+    }
+    if (typeDropdownOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [typeDropdownOpen]);
 
   useEffect(() => {
     if (initialTypeFilter !== undefined && initialTypeFilter !== typeFilter) {
@@ -1049,12 +1064,38 @@ function ApplicationsTab({ apps, loading, onRefresh, onAppUpdated, onAppDeleted,
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'var(--color-fg-muted)' }} />
               <input type="text" value={userFilter} onChange={(e) => setUserFilter(e.target.value)} placeholder="Filtrar por usuário..." className="w-full pl-8 pr-3 py-1.5 rounded-lg text-sm focus:outline-none" style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', color: 'var(--color-fg)' }} />
             </div>
-            <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="px-3 py-1.5 rounded-lg text-sm focus:outline-none" style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', color: 'var(--color-fg)' }}>
-              <option value="">Todos os tipos</option>
-              <option value="rabbitmq">RabbitMQ</option>
-              <option value="lavinmq">LavinMQ</option>
-              <option value="mongodb">MongoDB</option>
-            </select>
+            <div className="relative" ref={typeDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setTypeDropdownOpen((v) => !v)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm min-w-[140px] justify-between"
+                style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', color: 'var(--color-fg)' }}
+              >
+                <span>{typeFilter === "" ? "Todos os tipos" : typeFilter === "rabbitmq" ? "RabbitMQ" : typeFilter === "lavinmq" ? "LavinMQ" : "MongoDB"}</span>
+                <ChevronDown className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--color-fg-muted)' }} />
+              </button>
+              {typeDropdownOpen && (
+                <div
+                  className="absolute z-50 mt-1 w-full rounded-xl overflow-hidden shadow-xl"
+                  style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}
+                >
+                  {[{ value: "", label: "Todos os tipos" }, { value: "rabbitmq", label: "RabbitMQ" }, { value: "lavinmq", label: "LavinMQ" }, { value: "mongodb", label: "MongoDB" }].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => { setTypeFilter(opt.value); setTypeDropdownOpen(false); }}
+                      className="w-full text-left px-3 py-2 text-sm transition-colors"
+                      style={typeFilter === opt.value
+                        ? { background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)', color: 'var(--color-primary)' }
+                        : { color: 'var(--color-fg)', background: 'transparent' }
+                      }
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             {hasActiveFilters && (
               <button onClick={() => { setUserFilter(""); setAppFilter(""); setTypeFilter(""); setDeletedFilter("active"); }} className="px-3 py-1.5 rounded-lg text-xs" style={{ color: 'var(--color-fg-muted)', border: '1px solid var(--color-border)' }}>Limpar</button>
             )}
