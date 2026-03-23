@@ -179,8 +179,9 @@ interface MongoInstanceDetails {
 
 async function provisionMongoInstance(userId: string): Promise<MongoInstanceDetails> {
   const shortId = userId.replace(/-/g, "").substring(0, 12);
+  const suffix = Array.from(crypto.getRandomValues(new Uint8Array(4))).map(b => b.toString(16).padStart(2, "0")).join("");
   const dbName = `app_${shortId}`;
-  const dbUser = `user_${shortId}`;
+  const dbUser = `user_${shortId}_${suffix}`;
   const dbPassword = generateSecurePassword(24);
   const collectionName = "main";
 
