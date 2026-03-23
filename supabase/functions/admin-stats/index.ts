@@ -61,10 +61,12 @@ Deno.serve(async (req: Request) => {
 
     const profilesMap = new Map(profiles.map((p: { id: string; name: string }) => [p.id, p]));
 
-    const capacityByType = limits.reduce((acc: Record<string, number>, l: { app_type: string; max_apps: number }) => {
-      acc[l.app_type] = (acc[l.app_type] || 0) + (l.max_apps || 0);
-      return acc;
-    }, {});
+    const totalUserCount = authUsers.length > 0 ? authUsers.length : profiles.length;
+    const capacityByType: Record<string, number> = {
+      rabbitmq: totalUserCount,
+      lavinmq: totalUserCount,
+      mongodb: totalUserCount,
+    };
 
     const usedByType = activeApps.reduce((acc: Record<string, number>, a: { type: string }) => {
       acc[a.type] = (acc[a.type] || 0) + 1;
