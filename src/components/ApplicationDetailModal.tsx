@@ -21,6 +21,9 @@ import {
   Terminal,
   ChevronDown,
   ChevronUp,
+  FileText,
+  Hash,
+  Layers,
 } from "lucide-react";
 import type { Application } from "../types/database";
 import { invokeWithAuth } from "../lib/supabase";
@@ -188,6 +191,26 @@ function MongoGuide({ app }: { app: Application }) {
         </p>
       </div>
 
+      <GuideSection title="Acesso via MongoDB Atlas">
+        <p className="text-xs leading-relaxed" style={{ color: "var(--color-fg-muted)" }}>
+          O explorador visual de dados está disponível no painel do MongoDB Atlas. Use as credenciais abaixo para acessar o Data Explorer e navegar pelas suas collections.
+        </p>
+        <div className="space-y-1.5 mt-1">
+          <div className="flex items-center gap-2 text-xs" style={{ color: "var(--color-fg-muted)" }}>
+            <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0" style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e" }}>1</span>
+            Acesse <span className="font-mono font-medium" style={{ color: "var(--color-fg)" }}>cloud.mongodb.com</span> e faça login
+          </div>
+          <div className="flex items-center gap-2 text-xs" style={{ color: "var(--color-fg-muted)" }}>
+            <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0" style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e" }}>2</span>
+            Navegue até <span className="font-semibold" style={{ color: "var(--color-fg)" }}>Collections</span> no cluster
+          </div>
+          <div className="flex items-center gap-2 text-xs" style={{ color: "var(--color-fg-muted)" }}>
+            <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0" style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e" }}>3</span>
+            Selecione o database <span className="font-mono font-medium" style={{ color: "var(--color-fg)" }}>{app.mongo_db}</span>
+          </div>
+        </div>
+      </GuideSection>
+
       <GuideSection title="Node.js / TypeScript">
         <CodeBlock label="Instalação" code="npm install mongodb" />
         <CodeBlock label="Conexão" code={`import { MongoClient } from 'mongodb';
@@ -319,6 +342,209 @@ connection.close()`} />
 LAVINMQ_HOST=${host}
 LAVINMQ_USER=${user}`} />
       </GuideSection>
+    </div>
+  );
+}
+
+interface MongoCollection {
+  name: string;
+  count: number;
+  fields: string[];
+}
+
+interface MongoDocument {
+  _id: string;
+  [key: string]: unknown;
+}
+
+interface CollectionDetail {
+  collection: string;
+  count: number;
+  indexes: Array<{ name: string; key: Record<string, unknown> }>;
+  documents: MongoDocument[];
+}
+
+function MongoExplorer({ app }: { app: Application }) {
+  const [collections, setCollections] = useState<MongoCollection[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedCol, setSelectedCol] = useState<string | null>(null);
+  const [colDetail, setColDetail] = useState<CollectionDetail | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [expandedDoc, setExpandedDoc] = useState<string | null>(null);
+
+  const loadCollections = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const { data, error: err } = await invokeWithAuth("mongo-explorer", { appId: app.id });
+    if (err || (data as Record<string, unknown>)?.error) {
+      setError((data as Record<string, unknown>)?.error as string || "Erro ao carregar collections");
+    } else {
+      setCollections(((data as Record<string, unknown>)?.collections as MongoCollection[]) || []);
+    }
+    setLoading(false);
+  }, [app.id]);
+
+  const loadCollection = useCallback(async (name: string) => {
+    setSelectedCol(name);
+    setLoadingDetail(true);
+    setColDetail(null);
+    setExpandedDoc(null);
+    const { data, error: err } = await invokeWithAuth("mongo-explorer", { appId: app.id, collection: name });
+    if (err || (data as Record<string, unknown>)?.error) {
+      setColDetail(null);
+    } else {
+      setColDetail(data as CollectionDetail);
+    }
+    setLoadingDetail(false);
+  }, [app.id]);
+
+  useEffect(() => { loadCollections(); }, [loadCollections]);
+
+  return (
+    <div className="flex h-full" style={{ minHeight: "360px" }}>
+      {/* Sidebar — collection list */}
+      <div className="w-52 flex-shrink-0 flex flex-col" style={{ borderRight: "1px solid var(--color-border)" }}>
+        <div className="flex items-center justify-between px-3 py-2.5 flex-shrink-0" style={{ borderBottom: "1px solid var(--color-border)" }}>
+          <div className="flex items-center gap-1.5">
+            <Database className="w-3.5 h-3.5" style={{ color: "#22c55e" }} />
+            <span className="text-xs font-semibold truncate max-w-[100px]" style={{ color: "var(--color-fg)" }}>{app.mongo_db}</span>
+          </div>
+          <button
+            onClick={loadCollections}
+            disabled={loading}
+            className="p-1 rounded"
+            style={{ color: "var(--color-fg-muted)", outline: "none" }}
+          >
+            <RefreshCw className={`w-3 h-3 ${loading ? "animate-spin" : ""}`} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto py-1">
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="w-4 h-4 animate-spin" style={{ color: "var(--color-fg-muted)" }} />
+            </div>
+          ) : error ? (
+            <div className="px-3 py-3">
+              <p className="text-xs" style={{ color: "#ef4444" }}>{error}</p>
+            </div>
+          ) : collections.length === 0 ? (
+            <div className="px-3 py-4 text-center">
+              <Layers className="w-5 h-5 mx-auto mb-1.5" style={{ color: "var(--color-fg-muted)" }} />
+              <p className="text-xs" style={{ color: "var(--color-fg-muted)" }}>Nenhuma collection</p>
+            </div>
+          ) : (
+            collections.map((col) => (
+              <button
+                key={col.name}
+                onClick={() => loadCollection(col.name)}
+                className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
+                style={{
+                  background: selectedCol === col.name ? "color-mix(in srgb, var(--color-primary) 10%, transparent)" : "transparent",
+                  outline: "none",
+                  borderLeft: selectedCol === col.name ? "2px solid var(--color-primary)" : "2px solid transparent",
+                }}
+              >
+                <Table className="w-3 h-3 flex-shrink-0" style={{ color: selectedCol === col.name ? "var(--color-primary)" : "var(--color-fg-muted)" }} />
+                <span className="text-xs truncate flex-1" style={{ color: selectedCol === col.name ? "var(--color-primary)" : "var(--color-fg)" }}>{col.name}</span>
+                <span className="text-xs font-mono flex-shrink-0" style={{ color: "var(--color-fg-muted)" }}>{col.count}</span>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Main — documents */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {!selectedCol ? (
+          <div className="flex flex-col items-center justify-center h-full py-12 text-center px-4">
+            <Terminal className="w-8 h-8 mb-3" style={{ color: "var(--color-fg-muted)" }} />
+            <p className="text-sm font-medium" style={{ color: "var(--color-fg)" }}>Selecione uma collection</p>
+            <p className="text-xs mt-1" style={{ color: "var(--color-fg-muted)" }}>Clique em uma collection para explorar os documentos.</p>
+          </div>
+        ) : loadingDetail ? (
+          <div className="flex items-center justify-center h-full py-12">
+            <RefreshCw className="w-5 h-5 animate-spin" style={{ color: "var(--color-fg-muted)" }} />
+          </div>
+        ) : colDetail ? (
+          <div className="flex flex-col h-full overflow-hidden">
+            {/* Collection header */}
+            <div className="flex items-center gap-3 px-4 py-2.5 flex-shrink-0" style={{ borderBottom: "1px solid var(--color-border)", background: "var(--color-bg-secondary)" }}>
+              <Table className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "var(--color-primary)" }} />
+              <span className="text-xs font-semibold font-mono" style={{ color: "var(--color-fg)" }}>{colDetail.collection}</span>
+              <span className="ml-auto flex items-center gap-1 text-xs" style={{ color: "var(--color-fg-muted)" }}>
+                <Hash className="w-3 h-3" />
+                {colDetail.count} docs
+              </span>
+            </div>
+
+            {/* Indexes row */}
+            {colDetail.indexes.length > 0 && (
+              <div className="flex items-center gap-2 px-4 py-1.5 overflow-x-auto flex-shrink-0" style={{ borderBottom: "1px solid var(--color-border)" }}>
+                <span className="text-xs flex-shrink-0" style={{ color: "var(--color-fg-muted)" }}>Índices:</span>
+                {colDetail.indexes.map((idx) => (
+                  <span key={idx.name} className="text-xs font-mono px-2 py-0.5 rounded flex-shrink-0" style={{ background: "var(--color-bg-secondary)", border: "1px solid var(--color-border)", color: "var(--color-fg-muted)" }}>
+                    {idx.name}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Documents */}
+            <div className="flex-1 overflow-y-auto">
+              {colDetail.documents.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <FileText className="w-6 h-6 mb-2" style={{ color: "var(--color-fg-muted)" }} />
+                  <p className="text-xs" style={{ color: "var(--color-fg-muted)" }}>Nenhum documento encontrado</p>
+                </div>
+              ) : (
+                <div className="divide-y" style={{ borderColor: "var(--color-border)" }}>
+                  {colDetail.documents.map((doc) => {
+                    const isExpanded = expandedDoc === doc._id;
+                    const preview = Object.entries(doc)
+                      .filter(([k]) => k !== "_id")
+                      .slice(0, 3)
+                      .map(([k, v]) => `${k}: ${typeof v === "object" ? "{…}" : String(v).slice(0, 24)}`)
+                      .join("  ·  ");
+                    return (
+                      <div key={doc._id}>
+                        <button
+                          onClick={() => setExpandedDoc(isExpanded ? null : doc._id)}
+                          className="w-full flex items-start gap-2 px-4 py-2.5 text-left transition-colors hover:bg-white/5"
+                          style={{ outline: "none" }}
+                        >
+                          <span className="flex-shrink-0 mt-0.5">
+                            {isExpanded
+                              ? <ChevronUp className="w-3 h-3" style={{ color: "var(--color-fg-muted)" }} />
+                              : <ChevronDown className="w-3 h-3" style={{ color: "var(--color-fg-muted)" }} />}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs font-mono" style={{ color: "var(--color-primary)" }}>{doc._id}</span>
+                            {!isExpanded && preview && (
+                              <p className="text-xs mt-0.5 truncate" style={{ color: "var(--color-fg-muted)" }}>{preview}</p>
+                            )}
+                          </div>
+                        </button>
+                        {isExpanded && (
+                          <div className="px-4 pb-3">
+                            <pre
+                              className="text-xs font-mono p-3 rounded-xl overflow-x-auto leading-relaxed"
+                              style={{ background: "rgba(0,0,0,0.2)", color: "var(--color-fg)", border: "1px solid var(--color-border)" }}
+                            >
+                              {JSON.stringify(doc, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -496,7 +722,7 @@ export default function ApplicationDetailModal({ app, onClose }: ApplicationDeta
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto">
+        <div className={`flex-1 ${activeTab === "explorer" ? "overflow-hidden flex flex-col" : "overflow-y-auto"}`}>
 
           {/* ── LIMITS ── */}
           {activeTab === "limits" && !isMongoDB && (
@@ -596,51 +822,7 @@ export default function ApplicationDetailModal({ app, onClose }: ApplicationDeta
 
           {/* ── EXPLORER (MongoDB only) ── */}
           {activeTab === "explorer" && isMongoDB && (
-            <div className="p-5 space-y-4">
-              <div className="flex items-center gap-2 mb-1">
-                <Terminal className="w-4 h-4" style={{ color: typeColor }} />
-                <span className="text-sm font-semibold" style={{ color: "var(--color-fg)" }}>Explorador de Dados</span>
-              </div>
-
-              <div className="rounded-xl px-4 py-3 flex items-start gap-3" style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.15)" }}>
-                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: "#22c55e" }} />
-                <div>
-                  <p className="text-xs font-medium mb-1" style={{ color: "var(--color-fg)" }}>Acesso via MongoDB Atlas</p>
-                  <p className="text-xs leading-relaxed" style={{ color: "var(--color-fg-muted)" }}>
-                    O explorador visual de dados está disponível no painel do MongoDB Atlas. Use as credenciais abaixo para acessar o Data Explorer e navegar pelas suas collections.
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="rounded-xl px-3 py-2.5 flex items-center gap-3" style={{ background: "var(--color-bg-secondary)", border: "1px solid var(--color-border)" }}>
-                  <Database className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "var(--color-fg-muted)" }} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs" style={{ color: "var(--color-fg-muted)" }}>Database</p>
-                    <p className="text-xs font-mono font-medium" style={{ color: "var(--color-fg)" }}>{app.mongo_db || "—"}</p>
-                  </div>
-                </div>
-                <div className="rounded-xl px-3 py-2.5 flex items-center gap-3" style={{ background: "var(--color-bg-secondary)", border: "1px solid var(--color-border)" }}>
-                  <Table className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "var(--color-fg-muted)" }} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs" style={{ color: "var(--color-fg-muted)" }}>Collection padrão</p>
-                    <p className="text-xs font-mono font-medium" style={{ color: "var(--color-fg)" }}>{app.mongo_collection || app.mongo_db || "—"}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-fg-muted)" }}>Consultas de exemplo</p>
-                <CodeBlock label="Listar documentos" code={`db.getCollection('${app.mongo_collection || app.mongo_db}').find({})`} />
-                <CodeBlock label="Inserir documento" code={`db.getCollection('${app.mongo_collection || app.mongo_db}').insertOne({
-  campo: 'valor',
-  criadoEm: new Date()
-})`} />
-                <CodeBlock label="Buscar por campo" code={`db.getCollection('${app.mongo_collection || app.mongo_db}').find({
-  campo: 'valor'
-})`} />
-              </div>
-            </div>
+            <MongoExplorer app={app} />
           )}
 
           {/* ── QUEUES (AMQP only) ── */}
