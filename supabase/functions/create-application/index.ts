@@ -199,7 +199,24 @@ async function provisionMongoInstance(userId: string): Promise<MongoInstanceDeta
   const clusterHost = await getClusterHostname();
   const connectionUrl = `mongodb+srv://${dbUser}:${encodeURIComponent(dbPassword)}@${clusterHost}/${dbName}?retryWrites=true&w=majority`;
 
+  await createDefaultCollection(connectionUrl, dbName, collectionName);
+
   return { connectionUrl, dbName, dbUser, dbPassword, collectionName };
+}
+
+async function createDefaultCollection(connectionUrl: string, dbName: string, collectionName: string): Promise<void> {
+  const { MongoClient } = await import("npm:mongodb@6");
+  const client = new MongoClient(connectionUrl, {
+    serverSelectionTimeoutMS: 15000,
+    connectTimeoutMS: 15000,
+  });
+  try {
+    await client.connect();
+    const db = client.db(dbName);
+    await db.createCollection(collectionName);
+  } finally {
+    await client.close();
+  }
 }
 
 async function provisionAmqpInstance(name: string, type: string): Promise<AmqpInstanceDetails> {
