@@ -1084,7 +1084,7 @@ function ApplicationsTab({ apps, loading, onRefresh, onAppUpdated, onAppDeleted,
                       key={opt.value}
                       type="button"
                       onClick={() => { setTypeFilter(opt.value); setTypeDropdownOpen(false); }}
-                      className="w-full text-left px-3 py-2 text-sm transition-colors"
+                      className="w-full text-left px-3 py-2 text-sm transition-colors hover:bg-white/5"
                       style={typeFilter === opt.value
                         ? { background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)', color: 'var(--color-primary)' }
                         : { color: 'var(--color-fg)', background: 'transparent' }
