@@ -167,13 +167,17 @@ export default function AdminDashboard() {
     );
   }
 
-  function handleAppDeleted(appId: string) {
+  async function handleAppDeleted(appId: string) {
     setUsers((prev) =>
       prev.map((u) => ({
         ...u,
-        applications: u.applications.filter((a) => a.id !== appId),
+        applications: u.applications.map((a) =>
+          a.id === appId ? { ...a, deleted_at: new Date().toISOString() } : a
+        ),
       }))
     );
+    await fetchUsers();
+    await loadNotifications();
   }
 
   async function handleMyAppCreate(name: string, type: string, ttlHours: number | null): Promise<{ error?: string; next_allowed_at?: string }> {
@@ -187,7 +191,10 @@ export default function AdminDashboard() {
   async function handleMyAppDelete(id: string) {
     setDeletingId(id);
     const result = await deleteApplication(id);
-    if (!result.error) setMyApps((prev) => prev.filter((a) => a.id !== id));
+    if (!result.error) {
+      await fetchMyApps();
+      await loadNotifications();
+    }
     setDeletingId(null);
   }
 
@@ -1727,8 +1734,12 @@ function AdminAppRow({ app, onUpdated, onDeleted, showDeletedAt }: AdminAppRowPr
   async function handleDelete() {
     setDeleting(true);
     const result = await adminDeleteApplication(app.id);
-    setDeleting(false);
-    if (!result.error) onDeleted();
+    if (!result.error) {
+      onDeleted();
+    } else {
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
   }
 
   async function handleRotatePassword() {
@@ -1823,12 +1834,14 @@ function AdminAppRow({ app, onUpdated, onDeleted, showDeletedAt }: AdminAppRowPr
 
           {confirmDelete ? (
             <div className="flex items-center gap-1">
-              <button onClick={() => { handleDelete(); setConfirmDelete(false); }} disabled={deleting} className="p-1.5 rounded-lg disabled:opacity-50" style={{ color: '#ef4444' }}>
+              <button onClick={handleDelete} disabled={deleting} className="p-1.5 rounded-lg disabled:opacity-50" style={{ color: '#ef4444' }} title={deleting ? "Excluindo..." : "Confirmar exclusão"}>
                 {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
               </button>
-              <button onClick={() => setConfirmDelete(false)} style={{ color: 'var(--color-fg-muted)' }} className="p-1.5 rounded-lg">
-                <X className="w-3.5 h-3.5" />
-              </button>
+              {!deleting && (
+                <button onClick={() => setConfirmDelete(false)} style={{ color: 'var(--color-fg-muted)' }} className="p-1.5 rounded-lg">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           ) : (
             <button onClick={() => setConfirmDelete(true)} className="p-1.5 rounded-lg transition-all" style={{ color: 'var(--color-fg-muted)' }} title="Deletar">

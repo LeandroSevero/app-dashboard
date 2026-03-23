@@ -11,6 +11,7 @@ import {
   BarChart3,
   Timer,
   AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import type { Application } from "../types/database";
 
@@ -255,16 +256,19 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
             <button
               onClick={() => onDelete(app.id)}
               disabled={deleting}
-              className="btn-glass-danger text-xs font-medium px-2.5 py-1 rounded-lg disabled:opacity-50"
+              className="btn-glass-danger text-xs font-medium px-2.5 py-1 rounded-lg disabled:opacity-50 flex items-center gap-1"
             >
-              {deleting ? "..." : "Sim"}
+              {deleting && <Loader2 className="w-3 h-3 animate-spin" />}
+              {deleting ? "Excluindo..." : "Sim"}
             </button>
-            <button
-              onClick={() => setConfirmDelete(false)}
-              className="btn-glass text-xs font-medium px-2.5 py-1 rounded-lg"
-            >
-              Não
-            </button>
+            {!deleting && (
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="btn-glass text-xs font-medium px-2.5 py-1 rounded-lg"
+              >
+                Não
+              </button>
+            )}
           </div>
         ) : (
           <button

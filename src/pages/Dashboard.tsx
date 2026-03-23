@@ -115,7 +115,8 @@ export default function Dashboard() {
     setDeletingId(id);
     const result = await deleteApplication(id);
     if (!result.error) {
-      setApplications((prev) => prev.filter((a) => a.id !== id));
+      await fetchApplications();
+      await loadNotifications();
     }
     setDeletingId(null);
   }
