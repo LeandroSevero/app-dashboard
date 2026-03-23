@@ -468,28 +468,61 @@ function TypeCard({ icon, label, count, color, bg, border, onClick }: { icon: Re
 
 function MiniChart({ title, data, color }: { title: string; data: Array<{ date: string; count: number }>; color: string }) {
   const max = Math.max(...data.map((d) => d.count), 1);
+  const mid = Math.round(max / 2);
+  const chartHeight = 56;
   return (
     <div className="rounded-2xl p-5" style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}>
       <div className="flex items-center gap-2 mb-4">
         <TrendingUp className="w-4 h-4" style={{ color }} />
         <p className="text-sm font-semibold" style={{ color: 'var(--color-fg)' }}>{title}</p>
       </div>
-      <div className="flex items-end gap-1.5 h-16">
-        {data.map((d) => {
-          const pct = (d.count / max) * 100;
-          const day = new Date(d.date + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short" });
-          return (
-            <div key={d.date} className="flex-1 flex flex-col items-center gap-1">
-              <div className="w-full flex items-end" style={{ height: 48 }}>
-                <div
-                  className="w-full rounded-t-sm transition-all duration-500"
-                  style={{ height: `${Math.max(pct, 4)}%`, background: color, opacity: 0.8 }}
-                />
-              </div>
-              <span className="text-xs" style={{ color: 'var(--color-fg-muted)', fontSize: '0.6rem' }}>{day}</span>
+      <div className="flex gap-1.5">
+        <div className="flex flex-col justify-between pb-5 pr-1" style={{ height: chartHeight + 20 }}>
+          <span className="text-right leading-none" style={{ color: 'var(--color-fg-muted)', fontSize: '0.6rem' }}>{max}</span>
+          <span className="text-right leading-none" style={{ color: 'var(--color-fg-muted)', fontSize: '0.6rem' }}>{mid}</span>
+          <span className="text-right leading-none" style={{ color: 'var(--color-fg-muted)', fontSize: '0.6rem' }}>0</span>
+        </div>
+        <div className="flex-1 flex flex-col">
+          <div className="flex items-end gap-1.5 relative" style={{ height: chartHeight }}>
+            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+              <div style={{ borderBottom: '1px dashed var(--color-border)', opacity: 0.5 }} />
+              <div style={{ borderBottom: '1px dashed var(--color-border)', opacity: 0.5 }} />
+              <div style={{ borderBottom: '1px solid var(--color-border)', opacity: 0.7 }} />
             </div>
-          );
-        })}
+            {data.map((d) => {
+              const pct = (d.count / max) * 100;
+              const day = new Date(d.date + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short" });
+              return (
+                <div key={d.date} className="relative flex-1 flex flex-col items-center gap-1 group">
+                  <div className="w-full flex items-end" style={{ height: chartHeight }}>
+                    <div
+                      className="w-full rounded-t-sm transition-all duration-500"
+                      style={{ height: `${Math.max(pct, 2)}%`, background: color, opacity: 0.85 }}
+                    />
+                  </div>
+                  {d.count > 0 && (
+                    <span
+                      className="absolute -top-4 left-1/2 -translate-x-1/2 text-center leading-none opacity-0 group-hover:opacity-100 transition-opacity"
+                      style={{ color, fontSize: '0.6rem', fontWeight: 700 }}
+                    >
+                      {d.count}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex gap-1.5 mt-1">
+            {data.map((d) => {
+              const day = new Date(d.date + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short" });
+              return (
+                <div key={d.date} className="flex-1 flex items-center justify-center">
+                  <span style={{ color: 'var(--color-fg-muted)', fontSize: '0.6rem' }}>{day}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
       <div className="mt-3 flex items-center justify-between">
         <p className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>Total</p>
