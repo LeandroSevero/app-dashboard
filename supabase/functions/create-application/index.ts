@@ -225,15 +225,18 @@ Deno.serve(async (req: Request) => {
     const { data: { user }, error: authError } = await userClient.auth.getUser();
     if (authError || !user) return jsonResponse({ success: false, error: "Não autorizado" }, 401);
 
-    let body: { name?: string; type?: string };
+    let body: { name?: string; type?: string; ttl_hours?: number };
     try {
       body = await req.json();
     } catch {
       return jsonResponse({ success: false, error: "Payload inválido" }, 400);
     }
 
-    const { name, type } = body;
+    const { name, type, ttl_hours } = body;
     if (!name || !type) return jsonResponse({ success: false, error: "name e type são obrigatórios" }, 400);
+
+    const ttlHours = typeof ttl_hours === "number" && [6, 12, 18, 24].includes(ttl_hours) ? ttl_hours : null;
+    const expiresAt = ttlHours ? new Date(Date.now() + ttlHours * 60 * 60 * 1000).toISOString() : null;
 
     const normalizedType = type.toLowerCase();
     if (!["rabbitmq", "lavinmq", "mongodb"].includes(normalizedType)) {
@@ -279,6 +282,7 @@ Deno.serve(async (req: Request) => {
         mongo_user: mongo.dbUser,
         mongo_password: mongo.dbPassword,
         connection_url: mongo.connectionUrl,
+        expires_at: expiresAt,
         created_at: now,
       };
 
@@ -304,6 +308,7 @@ Deno.serve(async (req: Request) => {
         cloudamqp_id: "",
         panel_url: "",
         created_at: app.created_at,
+        expires_at: expiresAt,
       };
     } else {
       const instance = await provisionAmqpInstance(finalName, normalizedType);
@@ -322,6 +327,7 @@ Deno.serve(async (req: Request) => {
         mqtt_tls_port: instance.mqttTlsPort,
         mqtt_user: instance.username,
         mqtt_password: instance.password,
+        expires_at: expiresAt,
         created_at: now,
       };
 
@@ -348,6 +354,7 @@ Deno.serve(async (req: Request) => {
         mqtt_username: app.mqtt_user,
         mqtt_password: app.mqtt_password,
         created_at: app.created_at,
+        expires_at: expiresAt,
       };
     }
 

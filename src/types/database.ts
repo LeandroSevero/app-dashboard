@@ -17,6 +17,7 @@ export interface Application {
   mongo_user?: string;
   mongo_password?: string;
   connection_url?: string;
+  expires_at?: string | null;
 }
 
 export interface UserProfile {

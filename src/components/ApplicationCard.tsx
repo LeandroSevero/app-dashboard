@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Copy,
   Eye,
@@ -9,6 +9,8 @@ import {
   ChevronDown,
   ChevronUp,
   BarChart3,
+  Timer,
+  AlertTriangle,
 } from "lucide-react";
 import type { Application } from "../types/database";
 
@@ -19,12 +21,40 @@ interface ApplicationCardProps {
   onViewDetails: (app: Application) => void;
 }
 
+function useCountdown(expiresAt: string | null | undefined) {
+  const [remaining, setRemaining] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!expiresAt) { setRemaining(null); return; }
+    const update = () => {
+      const diff = new Date(expiresAt).getTime() - Date.now();
+      setRemaining(diff > 0 ? diff : 0);
+    };
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [expiresAt]);
+
+  return remaining;
+}
+
+function formatCountdown(ms: number): string {
+  const totalSecs = Math.floor(ms / 1000);
+  const h = Math.floor(totalSecs / 3600);
+  const m = Math.floor((totalSecs % 3600) / 60);
+  const s = totalSecs % 60;
+  if (h > 0) return `${h}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
+  return `${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
+}
+
 export default function ApplicationCard({ app, onDelete, deleting, onViewDetails }: ApplicationCardProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [showMqttPassword, setShowMqttPassword] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showMqtt, setShowMqtt] = useState(false);
+  const remaining = useCountdown(app.expires_at);
+  const isExpiringSoon = remaining !== null && remaining < 30 * 60 * 1000;
 
   async function copyToClipboard(text: string, field: string) {
     try {
@@ -75,9 +105,30 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
               <p className="text-xs mt-0.5" style={{ color: 'var(--color-fg-muted)' }}>{createdDate}</p>
             </div>
           </div>
-          <span className="text-xs font-medium px-2.5 py-1 rounded-lg" style={typeBadgeStyle}>
-            {typeLabel}
-          </span>
+          <div className="flex flex-col items-end gap-1.5">
+            <span className="text-xs font-medium px-2.5 py-1 rounded-lg" style={typeBadgeStyle}>
+              {typeLabel}
+            </span>
+            {remaining !== null && (
+              <span
+                className="flex items-center gap-1 text-xs font-mono px-2 py-0.5 rounded-lg"
+                style={
+                  remaining === 0
+                    ? { color: "#ef4444", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }
+                    : isExpiringSoon
+                    ? { color: "#f59e0b", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)" }
+                    : { color: "var(--color-fg-muted)", background: "var(--color-bg-secondary)", border: "1px solid var(--color-border)" }
+                }
+              >
+                {remaining === 0 ? (
+                  <AlertTriangle className="w-3 h-3" />
+                ) : (
+                  <Timer className="w-3 h-3" />
+                )}
+                {remaining === 0 ? "Expirado" : formatCountdown(remaining)}
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="mb-3">

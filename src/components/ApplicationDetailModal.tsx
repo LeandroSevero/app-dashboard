@@ -13,6 +13,8 @@ import {
   BarChart3,
   AlertCircle,
   Wifi,
+  Timer,
+  AlertTriangle,
 } from "lucide-react";
 import type { Application } from "../types/database";
 import { invokeWithAuth } from "../lib/supabase";
@@ -83,6 +85,32 @@ function LimitBar({ value, max, label, unit }: { value: number; max: number; lab
   );
 }
 
+function useCountdown(expiresAt: string | null | undefined) {
+  const [remaining, setRemaining] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!expiresAt) { setRemaining(null); return; }
+    const update = () => {
+      const diff = new Date(expiresAt).getTime() - Date.now();
+      setRemaining(diff > 0 ? diff : 0);
+    };
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [expiresAt]);
+
+  return remaining;
+}
+
+function formatCountdown(ms: number): string {
+  const totalSecs = Math.floor(ms / 1000);
+  const h = Math.floor(totalSecs / 3600);
+  const m = Math.floor((totalSecs % 3600) / 60);
+  const s = totalSecs % 60;
+  if (h > 0) return `${h}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
+  return `${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
+}
+
 function StaticLimitRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between py-1.5">
@@ -116,6 +144,9 @@ export default function ApplicationDetailModal({ app, onClose }: ApplicationDeta
     month: "long",
     year: "numeric",
   });
+
+  const remaining = useCountdown(app.expires_at);
+  const isExpiringSoon = remaining !== null && remaining < 30 * 60 * 1000;
 
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
@@ -185,6 +216,21 @@ export default function ApplicationDetailModal({ app, onClose }: ApplicationDeta
               <p className="text-xs mt-0.5" style={{ color: "var(--color-fg-muted)" }}>
                 <span style={{ color: typeColor }}>{typeLabel}</span> · Criado em {createdDate}
               </p>
+              {remaining !== null && (
+                <span
+                  className="inline-flex items-center gap-1 text-xs font-mono px-2 py-0.5 rounded-lg mt-1.5"
+                  style={
+                    remaining === 0
+                      ? { color: "#ef4444", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }
+                      : isExpiringSoon
+                      ? { color: "#f59e0b", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)" }
+                      : { color: "var(--color-fg-muted)", background: "var(--color-bg-secondary)", border: "1px solid var(--color-border)" }
+                  }
+                >
+                  {remaining === 0 ? <AlertTriangle className="w-3 h-3" /> : <Timer className="w-3 h-3" />}
+                  {remaining === 0 ? "Expirado" : `Expira em ${formatCountdown(remaining)}`}
+                </span>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">

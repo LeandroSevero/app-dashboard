@@ -14,9 +14,10 @@ export async function listApplications(): Promise<{ applications: Application[];
 
 export async function createApplication(
   name: string,
-  type: string
+  type: string,
+  ttlHours: number | null = null
 ): Promise<{ application?: Application; error?: string; next_allowed_at?: string }> {
-  const res = await appSvc.createApplication(name, type);
+  const res = await appSvc.createApplication(name, type, ttlHours);
   return { application: res.data, error: res.error, next_allowed_at: res.next_allowed_at };
 }
 

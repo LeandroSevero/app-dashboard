@@ -69,8 +69,8 @@ export default function Dashboard() {
     setActiveSection("profile");
   }
 
-  async function handleCreate(name: string, type: string): Promise<{ error?: string; next_allowed_at?: string }> {
-    const result = await createApplication(name, type);
+  async function handleCreate(name: string, type: string, ttlHours: number | null): Promise<{ error?: string; next_allowed_at?: string }> {
+    const result = await createApplication(name, type, ttlHours);
     if (result.error) {
       return { error: result.error, next_allowed_at: result.next_allowed_at };
     }

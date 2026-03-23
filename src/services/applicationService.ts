@@ -23,6 +23,7 @@ function mapRow(row: Record<string, unknown>): Application {
     mongo_user: (row.mongo_user as string) || undefined,
     mongo_password: (row.mongo_password as string) || undefined,
     connection_url: (row.connection_url as string) || undefined,
+    expires_at: (row.expires_at as string | null) ?? null,
   };
 }
 
@@ -47,7 +48,8 @@ export async function fetchApplications(): Promise<ApiResponse<Application[]>> {
 
 export async function createApplication(
   name: string,
-  type: string
+  type: string,
+  ttlHours: number | null = null
 ): Promise<ApiResponse<Application> & { next_allowed_at?: string }> {
   try {
     const token = await getValidToken();
@@ -64,7 +66,7 @@ export async function createApplication(
         Authorization: `Bearer ${token}`,
         Apikey: SUPABASE_ANON_KEY,
       },
-      body: JSON.stringify({ name: name.trim(), type }),
+      body: JSON.stringify({ name: name.trim(), type, ttl_hours: ttlHours }),
     });
 
     let json: Record<string, unknown> = {};
