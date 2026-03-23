@@ -24,6 +24,7 @@ import {
   FileText,
   Hash,
   Layers,
+  Loader2,
 } from "lucide-react";
 import type { Application } from "../types/database";
 import { invokeWithAuth } from "../lib/supabase";

@@ -179,8 +179,9 @@ interface MongoInstanceDetails {
 
 async function provisionMongoInstance(userId: string): Promise<MongoInstanceDetails> {
   const shortId = userId.replace(/-/g, "").substring(0, 12);
+  const suffix = Array.from(crypto.getRandomValues(new Uint8Array(4))).map(b => b.toString(16).padStart(2, "0")).join("");
   const dbName = `app_${shortId}`;
-  const dbUser = `user_${shortId}`;
+  const dbUser = `user_${shortId}_${suffix}`;
   const dbPassword = generateSecurePassword(24);
   const collectionName = "main";
 
@@ -199,7 +200,26 @@ async function provisionMongoInstance(userId: string): Promise<MongoInstanceDeta
   const clusterHost = await getClusterHostname();
   const connectionUrl = `mongodb+srv://${dbUser}:${encodeURIComponent(dbPassword)}@${clusterHost}/${dbName}?retryWrites=true&w=majority`;
 
+  await new Promise(resolve => setTimeout(resolve, 10000));
+
+  await createDefaultCollection(connectionUrl, dbName, collectionName);
+
   return { connectionUrl, dbName, dbUser, dbPassword, collectionName };
+}
+
+async function createDefaultCollection(connectionUrl: string, dbName: string, collectionName: string): Promise<void> {
+  const { MongoClient } = await import("npm:mongodb@6");
+  const client = new MongoClient(connectionUrl, {
+    serverSelectionTimeoutMS: 15000,
+    connectTimeoutMS: 15000,
+  });
+  try {
+    await client.connect();
+    const db = client.db(dbName);
+    await db.createCollection(collectionName);
+  } finally {
+    await client.close();
+  }
 }
 
 async function provisionAmqpInstance(name: string, type: string): Promise<AmqpInstanceDetails> {
