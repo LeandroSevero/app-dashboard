@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { default as md5sync } from "npm:md5@2.3.0";
+import { MongoClient } from "npm:mongodb@6";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,6 +16,7 @@ const ATLAS_PUBLIC_KEY = (Deno.env.get("Public_Key") || "").trim();
 const ATLAS_PRIVATE_KEY = (Deno.env.get("Private_Key") || "").trim();
 const ATLAS_PROJECT_ID = (Deno.env.get("Project_ID") || "").trim();
 const ATLAS_BASE_URL = "https://cloud.mongodb.com/api/atlas/v2";
+const MONGODB_ADMIN_URI = (Deno.env.get("aplicacoes_MONGODB_URI") || "").trim();
 
 function md5(message: string): string {
   return md5sync(message);
@@ -75,6 +77,17 @@ async function deleteAtlasDatabaseUser(username: string): Promise<void> {
   if (!res.ok && res.status !== 404) {
     const text = await res.text();
     throw new Error(`Atlas DELETE user ${res.status}: ${text}`);
+  }
+}
+
+async function dropMongoDatabase(dbName: string): Promise<void> {
+  if (!MONGODB_ADMIN_URI || !dbName) return;
+  const client = new MongoClient(MONGODB_ADMIN_URI);
+  try {
+    await client.connect();
+    await client.db(dbName).dropDatabase();
+  } finally {
+    await client.close();
   }
 }
 
@@ -143,7 +156,7 @@ Deno.serve(async (req: Request) => {
 
     let query = supabase
       .from("applications")
-      .select("id, type, cloudamqp_id, mongo_user, user_id")
+      .select("id, type, cloudamqp_id, mongo_user, mongo_db, user_id")
       .eq("id", appId)
       .is("deleted_at", null);
     if (!isAdmin) query = query.eq("user_id", user.id);
@@ -156,8 +169,9 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    if (app.type === "mongodb" && app.mongo_user) {
-      await deleteAtlasDatabaseUser(app.mongo_user);
+    if (app.type === "mongodb") {
+      if (app.mongo_user) await deleteAtlasDatabaseUser(app.mongo_user);
+      if (app.mongo_db) await dropMongoDatabase(app.mongo_db);
     } else if (app.cloudamqp_id) {
       await deleteCloudamqpInstance(app.cloudamqp_id);
     }
