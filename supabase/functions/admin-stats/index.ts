@@ -44,10 +44,10 @@ Deno.serve(async (req: Request) => {
     if (callerProfile?.role !== "admin") return json({ error: "Acesso negado" }, 403);
 
     const [profilesRes, allAppsRes, activeAppsRes, limitsRes, eventsRes, authUsersRes] = await Promise.all([
-      supabase.from("profiles").select("id, role, created_at"),
+      supabase.from("profiles").select("id, role, created_at, name"),
       supabase.from("applications").select("id, type, created_at, user_id"),
       supabase.from("applications").select("id, type, created_at, user_id").is("deleted_at", null),
-      supabase.from("user_limits").select("user_id, app_type, last_created_at, max_apps"),
+      supabase.from("user_limits").select("user_id, app_type, max_apps"),
       supabase.from("app_events").select("event_type, created_at").order("created_at", { ascending: false }).limit(200),
       supabase.rpc("get_all_auth_users"),
     ]);
@@ -59,8 +59,15 @@ Deno.serve(async (req: Request) => {
     const events = eventsRes.data || [];
     const authUsers = authUsersRes.data || [];
 
+    const profilesMap = new Map(profiles.map((p: { id: string; name: string }) => [p.id, p]));
+
     const capacityByType = limits.reduce((acc: Record<string, number>, l: { app_type: string; max_apps: number }) => {
       acc[l.app_type] = (acc[l.app_type] || 0) + (l.max_apps || 0);
+      return acc;
+    }, {});
+
+    const usedByType = activeApps.reduce((acc: Record<string, number>, a: { type: string }) => {
+      acc[a.type] = (acc[a.type] || 0) + 1;
       return acc;
     }, {});
 
@@ -68,10 +75,7 @@ Deno.serve(async (req: Request) => {
     const totalAdmins = profiles.filter((p: { role: string }) => p.role === "admin").length;
     const totalApps = activeApps.length;
 
-    const byType = activeApps.reduce((acc: Record<string, number>, a: { type: string }) => {
-      acc[a.type] = (acc[a.type] || 0) + 1;
-      return acc;
-    }, {});
+    const byType = usedByType;
 
     const errorEvents = events.filter((e: { event_type: string }) => e.event_type === "error");
     const recentErrors = errorEvents.slice(0, 5);
@@ -105,6 +109,46 @@ Deno.serve(async (req: Request) => {
       return Object.entries(days).map(([date, count]) => ({ date, count }));
     })();
 
+    const activeAppsCountByUserAndType: Record<string, Record<string, number>> = {};
+    for (const a of activeApps) {
+      if (!activeAppsCountByUserAndType[a.user_id]) activeAppsCountByUserAndType[a.user_id] = {};
+      activeAppsCountByUserAndType[a.user_id][a.type] = (activeAppsCountByUserAndType[a.user_id][a.type] || 0) + 1;
+    }
+
+    const userLimitsGrouped: Record<string, Record<string, number>> = {};
+    for (const l of limits as { user_id: string; app_type: string; max_apps: number }[]) {
+      if (!userLimitsGrouped[l.user_id]) userLimitsGrouped[l.user_id] = {};
+      userLimitsGrouped[l.user_id][l.app_type] = l.max_apps;
+    }
+
+    const userUsageByType: Array<{
+      user_id: string;
+      user_name: string;
+      by_type: { rabbitmq: { used: number; max: number }; lavinmq: { used: number; max: number }; mongodb: { used: number; max: number } };
+    }> = [];
+
+    const allUserIds = new Set([
+      ...Object.keys(userLimitsGrouped),
+      ...Object.keys(activeAppsCountByUserAndType),
+    ]);
+
+    for (const uid of allUserIds) {
+      const profile = profilesMap.get(uid) as { name?: string } | undefined;
+      const authUser = (authUsers as { id: string; email: string }[]).find((u) => u.id === uid);
+      const userName = profile?.name || authUser?.email || uid.slice(0, 8);
+      const usedForUser = activeAppsCountByUserAndType[uid] || {};
+      const limitsForUser = userLimitsGrouped[uid] || {};
+      userUsageByType.push({
+        user_id: uid,
+        user_name: userName,
+        by_type: {
+          rabbitmq: { used: usedForUser["rabbitmq"] || 0, max: limitsForUser["rabbitmq"] || 0 },
+          lavinmq: { used: usedForUser["lavinmq"] || 0, max: limitsForUser["lavinmq"] || 0 },
+          mongodb: { used: usedForUser["mongodb"] || 0, max: limitsForUser["mongodb"] || 0 },
+        },
+      });
+    }
+
     return json({
       stats: {
         total_users: totalUsers,
@@ -124,6 +168,7 @@ Deno.serve(async (req: Request) => {
         users_last_7_days: usersLast7Days,
         recent_errors: recentErrors,
         total_errors: errorEvents.length,
+        user_usage_by_type: userUsageByType,
       },
     });
   } catch (err) {

@@ -48,7 +48,7 @@ import {
   createApplication,
   deleteApplication,
 } from "../lib/api";
-import type { AdminStats, AdminLog } from "../services/adminService";
+import type { AdminStats, AdminLog, UserUsageByType } from "../services/adminService";
 import type { AdminUser, Application } from "../types/database";
 import { useAuth } from "../context/AuthContext";
 
@@ -1029,157 +1029,220 @@ interface ResourcesTabProps {
   onRefresh: () => void;
 }
 
+const APP_TYPE_CONFIG = {
+  rabbitmq: { label: "RabbitMQ", color: "#f97316", bg: "rgba(249,115,22,0.08)", border: "rgba(249,115,22,0.2)", icon: "/RabbitMQ.svg" },
+  lavinmq: { label: "LavinMQ", color: "#06b6d4", bg: "rgba(6,182,212,0.08)", border: "rgba(6,182,212,0.2)", icon: "/LavinMQ.svg" },
+  mongodb: { label: "MongoDB", color: "#22c55e", bg: "rgba(34,197,94,0.08)", border: "rgba(34,197,94,0.2)", icon: "/mongodb.svg" },
+};
+
+function UsageBar({ used, max, color }: { used: number; max: number; color: string }) {
+  const pct = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0;
+  const barColor = pct >= 90 ? "#ef4444" : pct >= 70 ? "#f59e0b" : color;
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-bg-secondary)' }}>
+        <div
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${pct}%`, background: barColor }}
+        />
+      </div>
+      <span className="text-xs tabular-nums flex-shrink-0 w-16 text-right" style={{ color: barColor }}>
+        {used}/{max} <span style={{ color: 'var(--color-fg-muted)', fontWeight: 400 }}>({pct}%)</span>
+      </span>
+    </div>
+  );
+}
+
 function ResourcesTab({ apps, loading, onRefresh }: ResourcesTabProps) {
   const [stats, setStats] = useState<AdminStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   useEffect(() => {
-    adminGetStats().then(({ stats: s }) => { if (s) setStats(s); });
+    setStatsLoading(true);
+    adminGetStats().then(({ stats: s }) => {
+      if (s) setStats(s);
+      setStatsLoading(false);
+    });
   }, []);
 
-  const mongoApps = apps.filter((a) => a.type === "mongodb");
-  const rabbitApps = apps.filter((a) => a.type === "rabbitmq");
-  const lavinApps = apps.filter((a) => a.type === "lavinmq");
+  const orgUsed = stats?.by_type ?? { rabbitmq: 0, lavinmq: 0, mongodb: 0 };
+  const orgCapacity = stats?.capacity_by_type ?? { rabbitmq: 0, lavinmq: 0, mongodb: 0 };
+  const userUsage: UserUsageByType[] = stats?.user_usage_by_type ?? [];
 
-  const capacity = stats?.capacity_by_type ?? { rabbitmq: 0, lavinmq: 0, mongodb: 0 };
+  const isLoading = loading || statsLoading;
+
+  const appTypes = ["rabbitmq", "lavinmq", "mongodb"] as const;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--color-fg)' }}>Recursos</h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--color-fg-muted)' }}>Visão dos recursos de infraestrutura alocados.</p>
+          <p className="text-sm mt-1" style={{ color: 'var(--color-fg-muted)' }}>Uso de slots por usuário e visão geral da organização.</p>
         </div>
-        <button onClick={onRefresh} className="btn-glass p-2 rounded-xl" title="Atualizar">
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+        <button onClick={() => { onRefresh(); setStatsLoading(true); adminGetStats().then(({ stats: s }) => { if (s) setStats(s); setStatsLoading(false); }); }} className="btn-glass p-2 rounded-xl" title="Atualizar">
+          <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <ResourceCard
-          title="MongoDB Atlas"
-          icon={<img src="/mongodb.svg" alt="MongoDB" className="w-5 h-5" />}
-          color="#22c55e"
-          border="rgba(34,197,94,0.2)"
-          bg="rgba(34,197,94,0.05)"
-          used={mongoApps.length}
-          capacity={capacity.mongodb}
-          stats={[
-            { label: "Databases criadas", value: mongoApps.length },
-            { label: "Usuários criados", value: mongoApps.length },
-          ]}
-          items={mongoApps.map((a) => ({ name: a.name, sub: a.userEmail, detail: a.mongo_db || "—" }))}
-          loading={loading}
-          emptyText="Nenhuma instância MongoDB criada."
-        />
+      <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}>
+        <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
+            <h2 className="font-semibold text-sm" style={{ color: 'var(--color-fg)' }}>Visão Geral da Organização</h2>
+            <span className="text-xs ml-1" style={{ color: 'var(--color-fg-muted)' }}>— total de slots usados vs. capacidade configurada</span>
+          </div>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--color-fg-muted)' }} />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {appTypes.map((type) => {
+                const cfg = APP_TYPE_CONFIG[type];
+                const used = orgUsed[type] || 0;
+                const cap = orgCapacity[type] || 0;
+                const pct = cap > 0 ? Math.min(100, Math.round((used / cap) * 100)) : 0;
+                const barColor = pct >= 90 ? "#ef4444" : pct >= 70 ? "#f59e0b" : cfg.color;
+                return (
+                  <div key={type} className="rounded-xl p-4" style={{ background: cfg.bg, border: `1px solid ${cfg.border}` }}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <img src={cfg.icon} alt={cfg.label} className="w-4 h-4" />
+                      <span className="text-xs font-semibold" style={{ color: cfg.color }}>{cfg.label}</span>
+                      <span className="ml-auto text-xs font-bold tabular-nums" style={{ color: barColor }}>{used}<span style={{ color: 'var(--color-fg-muted)', fontWeight: 400 }}>/{cap} slots</span></span>
+                    </div>
+                    <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--color-bg-secondary)' }}>
+                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: barColor }} />
+                    </div>
+                    <p className="text-xs mt-2 text-right" style={{ color: 'var(--color-fg-muted)' }}>{pct}% utilizado</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
-        <ResourceCard
-          title="CloudAMQP — RabbitMQ"
-          icon={<img src="/RabbitMQ.svg" alt="RabbitMQ" className="w-5 h-5" />}
-          color="#f97316"
-          border="rgba(249,115,22,0.2)"
-          bg="rgba(249,115,22,0.05)"
-          used={rabbitApps.length}
-          capacity={capacity.rabbitmq}
-          stats={[
-            { label: "Instâncias criadas", value: rabbitApps.length },
-          ]}
-          items={rabbitApps.map((a) => ({ name: a.name, sub: a.userEmail, detail: a.mqtt_hostname || "—" }))}
-          loading={loading}
-          emptyText="Nenhuma instância RabbitMQ criada."
-        />
+        <div className="px-5 py-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="w-4 h-4" style={{ color: 'var(--color-fg-muted)' }} />
+            <h2 className="font-semibold text-sm" style={{ color: 'var(--color-fg)' }}>Uso por Usuário</h2>
+            <span className="text-xs ml-1" style={{ color: 'var(--color-fg-muted)' }}>— aplicações ativas vs. limite individual</span>
+          </div>
+
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--color-fg-muted)' }} />
+            </div>
+          ) : userUsage.length === 0 ? (
+            <div className="flex items-center justify-center py-8">
+              <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>Nenhum dado de uso encontrado.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {userUsage.map((u) => {
+                const hasAnyLimit = u.by_type.rabbitmq.max > 0 || u.by_type.lavinmq.max > 0 || u.by_type.mongodb.max > 0;
+                const isNearLimit = appTypes.some((t) => {
+                  const { used, max } = u.by_type[t];
+                  return max > 0 && used / max >= 0.7;
+                });
+                const isAtLimit = appTypes.some((t) => {
+                  const { used, max } = u.by_type[t];
+                  return max > 0 && used >= max;
+                });
+                const initials = u.user_name.substring(0, 2).toUpperCase();
+                return (
+                  <div key={u.user_id} className="rounded-xl p-4" style={{ background: 'var(--color-bg-secondary)', border: `1px solid ${isAtLimit ? 'rgba(239,68,68,0.3)' : isNearLimit ? 'rgba(245,158,11,0.3)' : 'var(--color-border)'}` }}>
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold" style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', color: 'var(--color-fg-muted)' }}>
+                        {initials}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate" style={{ color: 'var(--color-fg)' }}>{u.user_name}</p>
+                      </div>
+                      {isAtLimit && (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-md flex-shrink-0" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)' }}>
+                          No limite
+                        </span>
+                      )}
+                      {!isAtLimit && isNearLimit && (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-md flex-shrink-0" style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)' }}>
+                          Perto do limite
+                        </span>
+                      )}
+                    </div>
+                    {!hasAnyLimit ? (
+                      <p className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>Sem limites configurados.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {appTypes.map((type) => {
+                          const { used, max } = u.by_type[type];
+                          if (max === 0) return null;
+                          const cfg = APP_TYPE_CONFIG[type];
+                          return (
+                            <div key={type} className="flex items-center gap-3">
+                              <div className="flex items-center gap-1.5 w-24 flex-shrink-0">
+                                <img src={cfg.icon} alt={cfg.label} className="w-3.5 h-3.5" />
+                                <span className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>{cfg.label}</span>
+                              </div>
+                              <div className="flex-1">
+                                <UsageBar used={used} max={max} color={cfg.color} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
-      <ResourceCard
-        title="CloudAMQP — LavinMQ"
-        icon={<img src="/LavinMQ.svg" alt="LavinMQ" className="w-5 h-5" />}
-        color="#06b6d4"
-        border="rgba(6,182,212,0.2)"
-        bg="rgba(6,182,212,0.05)"
-        used={lavinApps.length}
-        capacity={capacity.lavinmq}
-        stats={[
-          { label: "Instâncias criadas", value: lavinApps.length },
-        ]}
-        items={lavinApps.map((a) => ({ name: a.name, sub: a.userEmail, detail: a.mqtt_hostname || "—" }))}
-        loading={loading}
-        emptyText="Nenhuma instância LavinMQ criada."
-      />
-    </div>
-  );
-}
-
-function ResourceCard({ title, icon, color, border, bg, used, capacity, stats, items, loading, emptyText }: {
-  title: string;
-  icon: React.ReactNode;
-  color: string;
-  border: string;
-  bg: string;
-  used: number;
-  capacity: number;
-  stats: Array<{ label: string; value: number }>;
-  items: Array<{ name: string; sub: string; detail: string }>;
-  loading: boolean;
-  emptyText: string;
-}) {
-  const pct = capacity > 0 ? Math.min(100, Math.round((used / capacity) * 100)) : 0;
-  const barColor = pct >= 90 ? "#ef4444" : pct >= 70 ? "#f59e0b" : color;
-
-  return (
-    <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}>
-      <div className="px-5 py-4 flex items-center gap-3" style={{ background: bg, borderBottom: `1px solid ${border}` }}>
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'var(--color-card)', border: `1px solid ${border}` }}>
-          {icon}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm" style={{ color: 'var(--color-fg)' }}>{title}</p>
-          <div className="flex items-center gap-4 mt-0.5">
-            {stats.map((s) => (
-              <p key={s.label} className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>
-                <span style={{ color, fontWeight: 600 }}>{s.value}</span> {s.label}
-              </p>
-            ))}
+      <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}>
+        <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
+          <div className="flex items-center gap-2">
+            <Package className="w-4 h-4" style={{ color: 'var(--color-fg-muted)' }} />
+            <h2 className="font-semibold text-sm" style={{ color: 'var(--color-fg)' }}>Instâncias Ativas</h2>
           </div>
         </div>
-        {capacity > 0 && (
-          <div className="flex-shrink-0 text-right" style={{ minWidth: 56 }}>
-            <p className="text-xs font-semibold tabular-nums" style={{ color: barColor }}>{used}<span style={{ color: 'var(--color-fg-muted)', fontWeight: 400 }}>/{capacity}</span></p>
-            <p className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>{pct}% usado</p>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-10">
+            <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--color-fg-muted)' }} />
           </div>
-        )}
-      </div>
-      {capacity > 0 && (
-        <div className="px-5 pt-3 pb-1">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>Uso de capacidade</span>
-            <span className="text-xs font-medium tabular-nums" style={{ color: barColor }}>{used} de {capacity} slots</span>
-          </div>
-          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-bg-secondary)' }}>
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{ width: `${pct}%`, background: barColor }}
-            />
-          </div>
-        </div>
-      )}
-      <div className="divide-y mt-2" style={{ borderColor: 'var(--color-border)' }}>
-        {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--color-fg-muted)' }} />
-          </div>
-        ) : items.length === 0 ? (
-          <div className="flex items-center justify-center py-8">
-            <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>{emptyText}</p>
+        ) : apps.filter((a) => !a.deleted_at).length === 0 ? (
+          <div className="flex items-center justify-center py-10">
+            <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>Nenhuma instância ativa.</p>
           </div>
         ) : (
-          items.map((item, i) => (
-            <div key={i} className="px-5 py-3 flex items-center gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate" style={{ color: 'var(--color-fg)' }}>{item.name}</p>
-                <p className="text-xs truncate mt-0.5" style={{ color: 'var(--color-fg-muted)' }}>{item.sub}</p>
-              </div>
-              <p className="text-xs font-mono flex-shrink-0 max-w-[140px] truncate" style={{ color: 'var(--color-border2)' }}>{item.detail}</p>
-            </div>
-          ))
+          <div>
+            {(["mongodb", "rabbitmq", "lavinmq"] as const).map((type) => {
+              const typeApps = apps.filter((a) => a.type === type && !a.deleted_at);
+              if (typeApps.length === 0) return null;
+              const cfg = APP_TYPE_CONFIG[type];
+              return (
+                <div key={type}>
+                  <div className="px-5 py-2.5 flex items-center gap-2" style={{ background: cfg.bg, borderBottom: `1px solid ${cfg.border}`, borderTop: '1px solid var(--color-border)' }}>
+                    <img src={cfg.icon} alt={cfg.label} className="w-3.5 h-3.5" />
+                    <span className="text-xs font-semibold" style={{ color: cfg.color }}>{cfg.label}</span>
+                    <span className="text-xs ml-auto" style={{ color: 'var(--color-fg-muted)' }}>{typeApps.length} instância{typeApps.length !== 1 ? "s" : ""}</span>
+                  </div>
+                  {typeApps.map((a, i) => (
+                    <div key={a.id} className="flex items-center gap-3 px-5 py-3" style={{ borderTop: i === 0 ? 'none' : '1px solid var(--color-border)' }}>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate" style={{ color: 'var(--color-fg)' }}>{a.name}</p>
+                        <p className="text-xs truncate mt-0.5" style={{ color: 'var(--color-fg-muted)' }}>{a.userEmail}</p>
+                      </div>
+                      <p className="text-xs font-mono flex-shrink-0 max-w-[140px] truncate" style={{ color: 'var(--color-border2)' }}>
+                        {type === "mongodb" ? (a.mongo_db || "—") : (a.mqtt_hostname || "—")}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>

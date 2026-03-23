@@ -4,6 +4,16 @@ import type { ApiResponse } from "../types/api";
 import type { AdminUser } from "../types/database";
 import { logEvent } from "./logService";
 
+export interface UserUsageByType {
+  user_id: string;
+  user_name: string;
+  by_type: {
+    rabbitmq: { used: number; max: number };
+    lavinmq: { used: number; max: number };
+    mongodb: { used: number; max: number };
+  };
+}
+
 export interface AdminStats {
   total_users: number;
   total_admins: number;
@@ -14,6 +24,7 @@ export interface AdminStats {
   users_last_7_days: Array<{ date: string; count: number }>;
   recent_errors: Array<Record<string, unknown>>;
   total_errors: number;
+  user_usage_by_type: UserUsageByType[];
 }
 
 export interface AdminLog {
