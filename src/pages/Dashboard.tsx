@@ -8,6 +8,7 @@ import {
   Activity,
   User,
   AlertCircle,
+  Search,
 } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Header from "../components/Header";
@@ -38,6 +39,7 @@ export default function Dashboard() {
   const [detailApp, setDetailApp] = useState<Application | null>(null);
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [appsInitialFilter, setAppsInitialFilter] = useState("");
 
   const [profileCompletion, setProfileCompletion] = useState(100);
   const [showProfilePopup, setShowProfilePopup] = useState(false);
@@ -147,6 +149,13 @@ export default function Dashboard() {
         notifications={notifications}
         onMarkNotificationRead={handleMarkNotificationRead}
         onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
+        onNotificationClick={(notif) => {
+          if (notif.meta?.event_type === "app_deleted") {
+            const appName = (notif.meta.app_name as string) ?? "";
+            setAppsInitialFilter(appName);
+            setActiveSection("applications");
+          }
+        }}
       />
 
       <main className={`${sidebarWidth} pt-14 transition-all duration-300 min-h-screen`}>
@@ -162,6 +171,7 @@ export default function Dashboard() {
               onRefresh={fetchApplications}
               onOpenCreate={() => setShowCreateModal(true)}
               onViewDetails={setDetailApp}
+              initialAppFilter={appsInitialFilter}
             />
           )}
           {activeSection === "profile" && (
@@ -279,6 +289,7 @@ interface ApplicationsSectionProps {
   onRefresh: () => void;
   onOpenCreate: () => void;
   onViewDetails: (app: Application) => void;
+  initialAppFilter?: string;
 }
 
 function ApplicationsSection({
@@ -290,7 +301,20 @@ function ApplicationsSection({
   onRefresh,
   onOpenCreate,
   onViewDetails,
+  initialAppFilter,
 }: ApplicationsSectionProps) {
+  const [appFilter, setAppFilter] = useState(initialAppFilter ?? "");
+
+  useEffect(() => {
+    if (initialAppFilter !== undefined && initialAppFilter !== "") {
+      setAppFilter(initialAppFilter);
+    }
+  }, [initialAppFilter]);
+
+  const filtered = appFilter
+    ? applications.filter((a) => a.name.toLowerCase().includes(appFilter.toLowerCase()))
+    : applications;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -299,6 +323,17 @@ function ApplicationsSection({
           <p className="text-sm mt-1" style={{ color: "var(--color-fg-muted)" }}>Gerencie suas instâncias de mensageria.</p>
         </div>
         <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "var(--color-fg-muted)" }} />
+            <input
+              type="text"
+              value={appFilter}
+              onChange={(e) => setAppFilter(e.target.value)}
+              placeholder="Buscar aplicação..."
+              className="pl-8 pr-3 py-1.5 rounded-lg text-sm focus:outline-none w-44"
+              style={{ background: "var(--color-bg-secondary)", border: "1px solid var(--color-border)", color: "var(--color-fg)" }}
+            />
+          </div>
           <button
             onClick={onRefresh}
             className="btn-glass p-2 rounded-xl"
@@ -342,9 +377,14 @@ function ApplicationsSection({
         </div>
       ) : applications.length === 0 && !error ? (
         <EmptyState onOpenCreate={onOpenCreate} />
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <Search className="w-8 h-8 mb-3" style={{ color: "var(--color-fg-muted)" }} />
+          <p className="text-sm" style={{ color: "var(--color-fg-muted)" }}>Nenhuma aplicação encontrada para "{appFilter}".</p>
+        </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {applications.map((app) => (
+          {filtered.map((app) => (
             <ApplicationCard
               key={app.id}
               app={app}
