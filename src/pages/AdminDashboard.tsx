@@ -338,20 +338,29 @@ function AdminDashboardSection({ onNavigate }: { onNavigate: (section: AdminSect
 }
 
 function BigStatCard({ icon, label, value, color, onClick }: { icon: React.ReactNode; label: string; value: number; color: string; onClick?: () => void }) {
-  const styles: Record<string, { bg: string; border: string; iconColor: string }> = {
-    primary: { bg: 'color-mix(in srgb, var(--color-primary) 6%, transparent)', border: 'color-mix(in srgb, var(--color-primary) 15%, transparent)', iconColor: 'var(--color-primary)' },
-    orange: { bg: 'rgba(249,115,22,0.05)', border: 'rgba(249,115,22,0.12)', iconColor: '#f97316' },
-    cyan: { bg: 'rgba(6,182,212,0.05)', border: 'rgba(6,182,212,0.12)', iconColor: '#06b6d4' },
-    red: { bg: 'rgba(239,68,68,0.05)', border: 'rgba(239,68,68,0.12)', iconColor: '#ef4444' },
+  const [hovered, setHovered] = useState(false);
+  const styles: Record<string, { bg: string; border: string; iconColor: string; glow: string }> = {
+    primary: { bg: 'color-mix(in srgb, var(--color-primary) 6%, transparent)', border: 'color-mix(in srgb, var(--color-primary) 18%, transparent)', iconColor: 'var(--color-primary)', glow: 'color-mix(in srgb, var(--color-primary) 22%, transparent)' },
+    orange: { bg: 'rgba(249,115,22,0.06)', border: 'rgba(249,115,22,0.18)', iconColor: '#f97316', glow: 'rgba(249,115,22,0.22)' },
+    cyan: { bg: 'rgba(6,182,212,0.06)', border: 'rgba(6,182,212,0.18)', iconColor: '#06b6d4', glow: 'rgba(6,182,212,0.22)' },
+    red: { bg: 'rgba(239,68,68,0.06)', border: 'rgba(239,68,68,0.18)', iconColor: '#ef4444', glow: 'rgba(239,68,68,0.22)' },
   };
   const s = styles[color];
   return (
     <button
       onClick={onClick}
-      className="rounded-2xl p-5 text-left w-full transition-all duration-150 group"
-      style={{ background: s.bg, border: `1px solid ${s.border}`, cursor: onClick ? 'pointer' : 'default' }}
-      onMouseEnter={e => { if (onClick) (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; }}
-      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="rounded-2xl p-5 text-left w-full group"
+      style={{
+        background: hovered && onClick ? `color-mix(in srgb, ${s.glow} 60%, ${s.bg})` : s.bg,
+        border: `1px solid ${hovered && onClick ? s.iconColor.replace('var(--color-primary)', 'color-mix(in srgb, var(--color-primary) 55%, transparent)') : s.border}`,
+        cursor: onClick ? 'pointer' : 'default',
+        outline: 'none',
+        boxShadow: hovered && onClick ? `0 0 18px 3px ${s.glow}, 0 4px 16px ${s.glow}` : 'none',
+        transform: hovered && onClick ? 'translateY(-2px)' : 'none',
+        transition: 'all 0.18s ease',
+      }}
     >
       <div className="flex items-center justify-between mb-3">
         <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>{label}</span>
@@ -359,20 +368,29 @@ function BigStatCard({ icon, label, value, color, onClick }: { icon: React.React
       </div>
       <p className="text-3xl font-bold" style={{ color: 'var(--color-fg)' }}>{value}</p>
       {onClick && (
-        <p className="text-xs mt-2 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: s.iconColor }}>Ver detalhes →</p>
+        <p className="text-xs mt-2 transition-opacity duration-150" style={{ color: s.iconColor, opacity: hovered ? 1 : 0 }}>Ver detalhes →</p>
       )}
     </button>
   );
 }
 
 function TypeCard({ icon, label, count, color, bg, border, onClick }: { icon: React.ReactNode; label: string; count: number; color: string; bg: string; border: string; onClick?: () => void }) {
+  const [hovered, setHovered] = useState(false);
   return (
     <button
       onClick={onClick}
-      className="rounded-2xl p-4 flex items-center gap-4 w-full text-left group transition-all duration-150"
-      style={{ background: bg, border: `1px solid ${border}`, cursor: onClick ? 'pointer' : 'default' }}
-      onMouseEnter={e => { if (onClick) (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; }}
-      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="rounded-2xl p-4 flex items-center gap-4 w-full text-left"
+      style={{
+        background: hovered && onClick ? `color-mix(in srgb, ${color} 10%, ${bg})` : bg,
+        border: `1px solid ${hovered && onClick ? color : border}`,
+        cursor: onClick ? 'pointer' : 'default',
+        outline: 'none',
+        boxShadow: hovered && onClick ? `0 0 18px 3px ${color}33, 0 4px 16px ${color}22` : 'none',
+        transform: hovered && onClick ? 'translateY(-2px)' : 'none',
+        transition: 'all 0.18s ease',
+      }}
     >
       <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'var(--color-card)', border: `1px solid ${border}` }}>
         {icon}
@@ -382,7 +400,7 @@ function TypeCard({ icon, label, count, color, bg, border, onClick }: { icon: Re
         <p className="text-2xl font-bold mt-0.5" style={{ color }}>{count}</p>
       </div>
       {onClick && (
-        <span className="text-xs opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" style={{ color }}>→</span>
+        <span className="text-xs flex-shrink-0 transition-opacity duration-150" style={{ color, opacity: hovered ? 1 : 0 }}>→</span>
       )}
     </button>
   );
@@ -1122,15 +1140,13 @@ function LogsTab({ initialTypeFilter, onTypeFilterConsumed }: { initialTypeFilte
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchLogs(initialTypeFilter || undefined); }, [fetchLogs]);
-
   useEffect(() => {
+    fetchLogs(initialTypeFilter || undefined);
     if (initialTypeFilter !== undefined) {
       setTypeFilter(initialTypeFilter);
-      if (initialTypeFilter) fetchLogs(initialTypeFilter);
       onTypeFilterConsumed?.();
     }
-  }, [initialTypeFilter]);
+  }, [fetchLogs]);
 
   function handleFilterChange(t: string) {
     setTypeFilter(t);
@@ -1155,21 +1171,26 @@ function LogsTab({ initialTypeFilter, onTypeFilterConsumed }: { initialTypeFilte
             <ScrollText className="w-4 h-4" style={{ color: 'var(--color-fg-muted)' }} />
             <h2 className="font-semibold text-sm" style={{ color: 'var(--color-fg)' }}>Eventos ({logs.length})</h2>
           </div>
-          <div className="flex items-center gap-2">
-            <Filter className="w-3.5 h-3.5" style={{ color: 'var(--color-fg-muted)' }} />
-            <select
-              value={typeFilter}
-              onChange={(e) => handleFilterChange(e.target.value)}
-              className="px-3 py-1.5 rounded-lg text-sm focus:outline-none"
-              style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', color: 'var(--color-fg)' }}
-            >
-              <option value="">Todos os eventos</option>
-              <option value="create">Criação</option>
-              <option value="delete">Exclusão</option>
-              <option value="update">Atualização</option>
-              <option value="rotate_password">Rotação de senha</option>
-              <option value="error">Erros</option>
-            </select>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Filter className="w-3.5 h-3.5 mr-1" style={{ color: 'var(--color-fg-muted)' }} />
+            {[
+              { value: "", label: "Todos" },
+              { value: "create", label: "Criação" },
+              { value: "delete", label: "Exclusão" },
+              { value: "update", label: "Atualização" },
+              { value: "rotate_password", label: "Rot. Senha" },
+              { value: "error", label: "Erros" },
+            ].map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => handleFilterChange(opt.value)}
+                className="text-xs px-2.5 py-1 rounded-lg transition-all"
+                style={typeFilter === opt.value
+                  ? { background: opt.value === "error" ? 'rgba(239,68,68,0.15)' : 'color-mix(in srgb, var(--color-primary) 12%, transparent)', color: opt.value === "error" ? '#ef4444' : 'var(--color-primary)', border: `1px solid ${opt.value === "error" ? 'rgba(239,68,68,0.35)' : 'color-mix(in srgb, var(--color-primary) 30%, transparent)'}` }
+                  : { background: 'var(--color-bg-secondary)', color: 'var(--color-fg-muted)', border: '1px solid var(--color-border)' }
+                }
+              >{opt.label}</button>
+            ))}
           </div>
         </div>
 
