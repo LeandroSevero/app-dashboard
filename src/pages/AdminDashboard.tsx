@@ -87,13 +87,17 @@ export default function AdminDashboard() {
 
   const [usersRoleFilter, setUsersRoleFilter] = useState<string>("");
   const [appsTypeFilter, setAppsTypeFilter] = useState<string>("");
+  const [appsAppFilter, setAppsAppFilter] = useState<string>("");
+  const [appsDeletedFilter, setAppsDeletedFilter] = useState<"all" | "active" | "deleted">("active");
   const [logsTypeFilter, setLogsTypeFilter] = useState<string>("");
 
   const sidebarWidth = sidebarCollapsed ? "ml-16" : "ml-60";
 
-  function navigateTo(section: AdminSection, filters?: { role?: string; appType?: string; logType?: string }) {
+  function navigateTo(section: AdminSection, filters?: { role?: string; appType?: string; logType?: string; appFilter?: string; deletedFilter?: "all" | "active" | "deleted" }) {
     if (filters?.role !== undefined) setUsersRoleFilter(filters.role);
     if (filters?.appType !== undefined) setAppsTypeFilter(filters.appType);
+    if (filters?.appFilter !== undefined) setAppsAppFilter(filters.appFilter);
+    if (filters?.deletedFilter !== undefined) setAppsDeletedFilter(filters.deletedFilter);
     if (filters?.logType !== undefined) setLogsTypeFilter(filters.logType);
     setActiveSection(section);
   }
@@ -214,6 +218,17 @@ export default function AdminDashboard() {
           await markAllNotificationsRead();
           setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
         }}
+        onNotificationClick={(notif) => {
+          if (notif.meta?.event_type === "app_deleted") {
+            const appName = (notif.meta.app_name as string) ?? "";
+            if (!usersFetched) fetchUsers();
+            navigateTo("admin-apps", {
+              appFilter: appName,
+              deletedFilter: "deleted",
+              appType: "",
+            });
+          }
+        }}
       />
 
       <main className={`${sidebarWidth} pt-14 transition-all duration-300 min-h-screen`}>
@@ -258,6 +273,10 @@ export default function AdminDashboard() {
               onAppDeleted={handleAppDeleted}
               initialTypeFilter={appsTypeFilter}
               onTypeFilterConsumed={() => setAppsTypeFilter("")}
+              initialAppFilter={appsAppFilter}
+              onAppFilterConsumed={() => setAppsAppFilter("")}
+              initialDeletedFilter={appsDeletedFilter}
+              onDeletedFilterConsumed={() => setAppsDeletedFilter("active")}
             />
           )}
 
@@ -970,15 +989,19 @@ interface ApplicationsTabProps {
   onAppDeleted: (appId: string) => void;
   initialTypeFilter?: string;
   onTypeFilterConsumed?: () => void;
+  initialAppFilter?: string;
+  onAppFilterConsumed?: () => void;
+  initialDeletedFilter?: DeletedFilter;
+  onDeletedFilterConsumed?: () => void;
 }
 
 type DeletedFilter = "all" | "active" | "deleted";
 
-function ApplicationsTab({ apps, loading, onRefresh, onAppUpdated, onAppDeleted, initialTypeFilter, onTypeFilterConsumed }: ApplicationsTabProps) {
+function ApplicationsTab({ apps, loading, onRefresh, onAppUpdated, onAppDeleted, initialTypeFilter, onTypeFilterConsumed, initialAppFilter, onAppFilterConsumed, initialDeletedFilter, onDeletedFilterConsumed }: ApplicationsTabProps) {
   const [userFilter, setUserFilter] = useState("");
-  const [appFilter, setAppFilter] = useState("");
+  const [appFilter, setAppFilter] = useState(initialAppFilter ?? "");
   const [typeFilter, setTypeFilter] = useState(initialTypeFilter ?? "");
-  const [deletedFilter, setDeletedFilter] = useState<DeletedFilter>("active");
+  const [deletedFilter, setDeletedFilter] = useState<DeletedFilter>(initialDeletedFilter ?? "active");
   const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
   const [hoveredTypeOpt, setHoveredTypeOpt] = useState<string | null>(null);
   const typeDropdownRef = useRef<HTMLDivElement>(null);
@@ -999,6 +1022,20 @@ function ApplicationsTab({ apps, loading, onRefresh, onAppUpdated, onAppDeleted,
       onTypeFilterConsumed?.();
     }
   }, [initialTypeFilter]);
+
+  useEffect(() => {
+    if (initialAppFilter !== undefined && initialAppFilter !== "") {
+      setAppFilter(initialAppFilter);
+      onAppFilterConsumed?.();
+    }
+  }, [initialAppFilter]);
+
+  useEffect(() => {
+    if (initialDeletedFilter !== undefined && initialDeletedFilter !== deletedFilter) {
+      setDeletedFilter(initialDeletedFilter);
+      onDeletedFilterConsumed?.();
+    }
+  }, [initialDeletedFilter]);
 
   const filtered = apps.filter((a) => {
     const matchUser = a.userEmail.toLowerCase().includes(userFilter.toLowerCase());

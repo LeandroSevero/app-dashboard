@@ -11,12 +11,14 @@ interface HeaderProps {
   notifications: Notification[];
   onMarkNotificationRead: (id: string) => void;
   onMarkAllNotificationsRead: () => void;
+  onNotificationClick?: (notification: Notification) => void;
 }
 
 export default function Header({
   notifications,
   onMarkNotificationRead,
   onMarkAllNotificationsRead,
+  onNotificationClick,
 }: HeaderProps) {
   const { user, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -65,6 +67,10 @@ export default function Header({
             onMarkAllRead={() => {
               onMarkAllNotificationsRead();
             }}
+            onNotificationClick={onNotificationClick ? (notif) => {
+              setShowNotifications(false);
+              onNotificationClick(notif);
+            } : undefined}
           />
         )}
       </div>

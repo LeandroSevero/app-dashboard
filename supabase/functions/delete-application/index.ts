@@ -181,6 +181,51 @@ Deno.serve(async (req: Request) => {
       meta: { name: app.name, type: app.type },
     });
 
+    const { data: ownerProfile } = await supabase
+      .from("profiles")
+      .select("email")
+      .eq("id", app.user_id)
+      .maybeSingle();
+    const ownerEmail = ownerProfile?.email ?? "";
+
+    const notifMeta = {
+      event_type: "app_deleted",
+      app_id: appId,
+      app_name: app.name,
+      app_type: app.type,
+      owner_email: ownerEmail,
+    };
+
+    await supabase.from("notifications").insert({
+      user_id: app.user_id,
+      title: "Recurso excluído",
+      message: `Seu recurso "${app.name}" (${app.type}) foi excluído.`,
+      type: "warning",
+      meta: notifMeta,
+    });
+
+    const { data: adminProfiles } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("role", "admin")
+      .neq("id", app.user_id);
+
+    if (adminProfiles && adminProfiles.length > 0) {
+      const deletedBy = isAdmin && user.id !== app.user_id
+        ? `pelo administrador (${user.email ?? ""})`
+        : `pelo próprio usuário`;
+
+      await supabase.from("notifications").insert(
+        adminProfiles.map((p: { id: string }) => ({
+          user_id: p.id,
+          title: "Recurso excluído",
+          message: `O recurso "${app.name}" (${app.type}) do usuário ${ownerEmail} foi excluído ${deletedBy}.`,
+          type: "warning",
+          meta: notifMeta,
+        }))
+      );
+    }
+
     const cleanup = async () => {
       if (app.type === "mongodb") {
         if (app.mongo_user) await deleteAtlasDatabaseUser(app.mongo_user);

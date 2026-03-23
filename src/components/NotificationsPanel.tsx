@@ -7,6 +7,7 @@ interface NotificationsPanelProps {
   onClose: () => void;
   onMarkRead: (id: string) => void;
   onMarkAllRead: () => void;
+  onNotificationClick?: (notification: Notification) => void;
 }
 
 function timeAgo(dateStr: string): string {
@@ -27,7 +28,7 @@ function NotificationIcon({ type }: { type: string }) {
   return <Info className="w-4 h-4" style={{ color: "var(--color-primary)" }} />;
 }
 
-export default function NotificationsPanel({ notifications, onClose, onMarkRead, onMarkAllRead }: NotificationsPanelProps) {
+export default function NotificationsPanel({ notifications, onClose, onMarkRead, onMarkAllRead, onNotificationClick }: NotificationsPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -108,12 +109,17 @@ export default function NotificationsPanel({ notifications, onClose, onMarkRead,
             {notifications.map((notif) => (
               <button
                 key={notif.id}
-                onClick={() => !notif.read && onMarkRead(notif.id)}
+                onClick={() => {
+                  if (!notif.read) onMarkRead(notif.id);
+                  if (notif.meta?.event_type === "app_deleted" && onNotificationClick) {
+                    onNotificationClick(notif);
+                  }
+                }}
                 className="w-full text-left px-4 py-3 transition-all flex gap-3"
                 style={{
                   background: notif.read ? "transparent" : "color-mix(in srgb, var(--color-primary) 10%, var(--color-card-solid))",
                   borderBottom: "1px solid var(--color-border)",
-                  cursor: notif.read ? "default" : "pointer",
+                  cursor: (notif.meta?.event_type === "app_deleted" && onNotificationClick) || !notif.read ? "pointer" : "default",
                 }}
               >
                 <div
