@@ -76,7 +76,18 @@ export default function AdminDashboard() {
   const [detailApp, setDetailApp] = useState<Application | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
+  const [usersRoleFilter, setUsersRoleFilter] = useState<string>("");
+  const [appsTypeFilter, setAppsTypeFilter] = useState<string>("");
+  const [logsTypeFilter, setLogsTypeFilter] = useState<string>("");
+
   const sidebarWidth = sidebarCollapsed ? "ml-16" : "ml-60";
+
+  function navigateTo(section: AdminSection, filters?: { role?: string; appType?: string; logType?: string }) {
+    if (filters?.role !== undefined) setUsersRoleFilter(filters.role);
+    if (filters?.appType !== undefined) setAppsTypeFilter(filters.appType);
+    if (filters?.logType !== undefined) setLogsTypeFilter(filters.logType);
+    setActiveSection(section);
+  }
 
   const fetchUsers = useCallback(async () => {
     setUsersLoading(true);
@@ -95,7 +106,7 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    if ((activeSection === "admin-users" || activeSection === "admin-apps" || activeSection === "admin-resources") && !usersFetched) {
+    if ((activeSection === "admin-users" || activeSection === "admin-apps" || activeSection === "admin-resources" || activeSection === "admin-logs") && !usersFetched) {
       fetchUsers();
     }
   }, [activeSection, usersFetched, fetchUsers]);
@@ -168,7 +179,7 @@ export default function AdminDashboard() {
         <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
 
           {activeSection === "admin-dashboard" && (
-            <AdminDashboardSection />
+            <AdminDashboardSection onNavigate={navigateTo} />
           )}
 
           {activeSection === "applications" && (
@@ -192,6 +203,8 @@ export default function AdminDashboard() {
               onRefresh={fetchUsers}
               onUserUpdated={handleUserUpdated}
               onUserDeleted={handleUserDeleted}
+              initialRoleFilter={usersRoleFilter}
+              onRoleFilterConsumed={() => setUsersRoleFilter("")}
             />
           )}
 
@@ -202,6 +215,8 @@ export default function AdminDashboard() {
               onRefresh={fetchUsers}
               onAppUpdated={handleAppUpdated}
               onAppDeleted={handleAppDeleted}
+              initialTypeFilter={appsTypeFilter}
+              onTypeFilterConsumed={() => setAppsTypeFilter("")}
             />
           )}
 
@@ -210,7 +225,7 @@ export default function AdminDashboard() {
           )}
 
           {activeSection === "admin-logs" && (
-            <LogsTab />
+            <LogsTab initialTypeFilter={logsTypeFilter} onTypeFilterConsumed={() => setLogsTypeFilter("")} />
           )}
         </div>
       </main>
@@ -232,7 +247,7 @@ export default function AdminDashboard() {
   );
 }
 
-function AdminDashboardSection() {
+function AdminDashboardSection({ onNavigate }: { onNavigate: (section: AdminSection, filters?: { role?: string; appType?: string; logType?: string }) => void }) {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -302,16 +317,16 @@ function AdminDashboardSection() {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <BigStatCard icon={<Users className="w-5 h-5" />} label="Usuários" value={stats.total_users} color="primary" />
-        <BigStatCard icon={<Boxes className="w-5 h-5" />} label="Aplicações" value={stats.total_apps} color="orange" />
-        <BigStatCard icon={<ShieldCheck className="w-5 h-5" />} label="Admins" value={stats.total_admins} color="cyan" />
-        <BigStatCard icon={<AlertCircle className="w-5 h-5" />} label="Erros" value={stats.total_errors} color="red" />
+        <BigStatCard icon={<Users className="w-5 h-5" />} label="Usuários" value={stats.total_users} color="primary" onClick={() => onNavigate("admin-users", { role: "" })} />
+        <BigStatCard icon={<Boxes className="w-5 h-5" />} label="Aplicações" value={stats.total_apps} color="orange" onClick={() => onNavigate("admin-apps", { appType: "" })} />
+        <BigStatCard icon={<ShieldCheck className="w-5 h-5" />} label="Admins" value={stats.total_admins} color="cyan" onClick={() => onNavigate("admin-users", { role: "admin" })} />
+        <BigStatCard icon={<AlertCircle className="w-5 h-5" />} label="Erros" value={stats.total_errors} color="red" onClick={() => onNavigate("admin-logs", { logType: "error" })} />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <TypeCard icon={<img src="/RabbitMQ.svg" className="w-5 h-5" />} label="RabbitMQ" count={stats.by_type.rabbitmq} color="#f97316" bg="rgba(249,115,22,0.08)" border="rgba(249,115,22,0.2)" />
-        <TypeCard icon={<img src="/LavinMQ.svg" className="w-5 h-5" />} label="LavinMQ" count={stats.by_type.lavinmq} color="#06b6d4" bg="rgba(6,182,212,0.08)" border="rgba(6,182,212,0.2)" />
-        <TypeCard icon={<img src="/mongodb.svg" alt="MongoDB" className="w-5 h-5" />} label="MongoDB" count={stats.by_type.mongodb} color="#22c55e" bg="rgba(34,197,94,0.08)" border="rgba(34,197,94,0.2)" />
+        <TypeCard icon={<img src="/RabbitMQ.svg" className="w-5 h-5" />} label="RabbitMQ" count={stats.by_type.rabbitmq} color="#f97316" bg="rgba(249,115,22,0.08)" border="rgba(249,115,22,0.2)" onClick={() => onNavigate("admin-apps", { appType: "rabbitmq" })} />
+        <TypeCard icon={<img src="/LavinMQ.svg" className="w-5 h-5" />} label="LavinMQ" count={stats.by_type.lavinmq} color="#06b6d4" bg="rgba(6,182,212,0.08)" border="rgba(6,182,212,0.2)" onClick={() => onNavigate("admin-apps", { appType: "lavinmq" })} />
+        <TypeCard icon={<img src="/mongodb.svg" alt="MongoDB" className="w-5 h-5" />} label="MongoDB" count={stats.by_type.mongodb} color="#22c55e" bg="rgba(34,197,94,0.08)" border="rgba(34,197,94,0.2)" onClick={() => onNavigate("admin-apps", { appType: "mongodb" })} />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -322,7 +337,7 @@ function AdminDashboardSection() {
   );
 }
 
-function BigStatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: number; color: string }) {
+function BigStatCard({ icon, label, value, color, onClick }: { icon: React.ReactNode; label: string; value: number; color: string; onClick?: () => void }) {
   const styles: Record<string, { bg: string; border: string; iconColor: string }> = {
     primary: { bg: 'color-mix(in srgb, var(--color-primary) 6%, transparent)', border: 'color-mix(in srgb, var(--color-primary) 15%, transparent)', iconColor: 'var(--color-primary)' },
     orange: { bg: 'rgba(249,115,22,0.05)', border: 'rgba(249,115,22,0.12)', iconColor: '#f97316' },
@@ -331,27 +346,45 @@ function BigStatCard({ icon, label, value, color }: { icon: React.ReactNode; lab
   };
   const s = styles[color];
   return (
-    <div className="rounded-2xl p-5" style={{ background: s.bg, border: `1px solid ${s.border}` }}>
+    <button
+      onClick={onClick}
+      className="rounded-2xl p-5 text-left w-full transition-all duration-150 group"
+      style={{ background: s.bg, border: `1px solid ${s.border}`, cursor: onClick ? 'pointer' : 'default' }}
+      onMouseEnter={e => { if (onClick) (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; }}
+    >
       <div className="flex items-center justify-between mb-3">
         <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>{label}</span>
         <span style={{ color: s.iconColor }}>{icon}</span>
       </div>
       <p className="text-3xl font-bold" style={{ color: 'var(--color-fg)' }}>{value}</p>
-    </div>
+      {onClick && (
+        <p className="text-xs mt-2 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: s.iconColor }}>Ver detalhes →</p>
+      )}
+    </button>
   );
 }
 
-function TypeCard({ icon, label, count, color, bg, border }: { icon: React.ReactNode; label: string; count: number; color: string; bg: string; border: string }) {
+function TypeCard({ icon, label, count, color, bg, border, onClick }: { icon: React.ReactNode; label: string; count: number; color: string; bg: string; border: string; onClick?: () => void }) {
   return (
-    <div className="rounded-2xl p-4 flex items-center gap-4" style={{ background: bg, border: `1px solid ${border}` }}>
+    <button
+      onClick={onClick}
+      className="rounded-2xl p-4 flex items-center gap-4 w-full text-left group transition-all duration-150"
+      style={{ background: bg, border: `1px solid ${border}`, cursor: onClick ? 'pointer' : 'default' }}
+      onMouseEnter={e => { if (onClick) (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; }}
+    >
       <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'var(--color-card)', border: `1px solid ${border}` }}>
         {icon}
       </div>
-      <div>
+      <div className="flex-1 min-w-0">
         <p className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>{label}</p>
         <p className="text-2xl font-bold mt-0.5" style={{ color }}>{count}</p>
       </div>
-    </div>
+      {onClick && (
+        <span className="text-xs opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" style={{ color }}>→</span>
+      )}
+    </button>
   );
 }
 
@@ -490,17 +523,29 @@ interface UsersTabProps {
   onRefresh: () => void;
   onUserUpdated: (userId: string, updates: Partial<AdminUser>) => void;
   onUserDeleted: (userId: string) => void;
+  initialRoleFilter?: string;
+  onRoleFilterConsumed?: () => void;
 }
 
-function UsersTab({ users, loading, onRefresh, onUserUpdated, onUserDeleted }: UsersTabProps) {
+function UsersTab({ users, loading, onRefresh, onUserUpdated, onUserDeleted, initialRoleFilter, onRoleFilterConsumed }: UsersTabProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState(initialRoleFilter ?? "");
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
-  const filtered = users.filter((u) =>
-    u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (u.full_name || "").toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  useEffect(() => {
+    if (initialRoleFilter !== undefined && initialRoleFilter !== roleFilter) {
+      setRoleFilter(initialRoleFilter);
+      onRoleFilterConsumed?.();
+    }
+  }, [initialRoleFilter]);
+
+  const filtered = users.filter((u) => {
+    const matchSearch = u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (u.full_name || "").toLowerCase().includes(searchQuery.toLowerCase());
+    const matchRole = roleFilter ? u.role === roleFilter : true;
+    return matchSearch && matchRole;
+  });
 
   async function handleDeleteUser(userId: string) {
     setDeletingUserId(userId);
@@ -526,7 +571,7 @@ function UsersTab({ users, loading, onRefresh, onUserUpdated, onUserDeleted }: U
         style={{ border: '1px solid var(--color-border)' }}
       >
         <div
-          className="flex items-center justify-between gap-3 px-6 py-4"
+          className="flex items-center justify-between gap-3 px-6 py-4 flex-wrap"
           style={{ background: 'var(--color-card)', borderBottom: '1px solid var(--color-border)' }}
         >
           <div className="flex items-center gap-2">
@@ -535,16 +580,44 @@ function UsersTab({ users, loading, onRefresh, onUserUpdated, onUserDeleted }: U
               Usuários ({filtered.length})
             </h2>
           </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'var(--color-fg-muted)' }} />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar usuário..."
-              className="pl-8 pr-3 py-1.5 rounded-lg text-sm focus:outline-none w-48"
-              style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', color: 'var(--color-fg)' }}
-            />
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setRoleFilter("")}
+                className="text-xs px-2.5 py-1 rounded-lg transition-all"
+                style={roleFilter === ""
+                  ? { background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 25%, transparent)' }
+                  : { background: 'var(--color-bg-secondary)', color: 'var(--color-fg-muted)', border: '1px solid var(--color-border)' }
+                }
+              >Todos</button>
+              <button
+                onClick={() => setRoleFilter("admin")}
+                className="text-xs px-2.5 py-1 rounded-lg transition-all"
+                style={roleFilter === "admin"
+                  ? { background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 25%, transparent)' }
+                  : { background: 'var(--color-bg-secondary)', color: 'var(--color-fg-muted)', border: '1px solid var(--color-border)' }
+                }
+              >Admins</button>
+              <button
+                onClick={() => setRoleFilter("user")}
+                className="text-xs px-2.5 py-1 rounded-lg transition-all"
+                style={roleFilter === "user"
+                  ? { background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 25%, transparent)' }
+                  : { background: 'var(--color-bg-secondary)', color: 'var(--color-fg-muted)', border: '1px solid var(--color-border)' }
+                }
+              >Usuários</button>
+            </div>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'var(--color-fg-muted)' }} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar usuário..."
+                className="pl-8 pr-3 py-1.5 rounded-lg text-sm focus:outline-none w-48"
+                style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', color: 'var(--color-fg)' }}
+              />
+            </div>
           </div>
         </div>
 
@@ -761,12 +834,21 @@ interface ApplicationsTabProps {
   onRefresh: () => void;
   onAppUpdated: (appId: string, updates: Partial<Application>) => void;
   onAppDeleted: (appId: string) => void;
+  initialTypeFilter?: string;
+  onTypeFilterConsumed?: () => void;
 }
 
-function ApplicationsTab({ apps, loading, onRefresh, onAppUpdated, onAppDeleted }: ApplicationsTabProps) {
+function ApplicationsTab({ apps, loading, onRefresh, onAppUpdated, onAppDeleted, initialTypeFilter, onTypeFilterConsumed }: ApplicationsTabProps) {
   const [userFilter, setUserFilter] = useState("");
   const [appFilter, setAppFilter] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState(initialTypeFilter ?? "");
+
+  useEffect(() => {
+    if (initialTypeFilter !== undefined && initialTypeFilter !== typeFilter) {
+      setTypeFilter(initialTypeFilter);
+      onTypeFilterConsumed?.();
+    }
+  }, [initialTypeFilter]);
 
   const filtered = apps.filter((a) => {
     const matchUser = a.userEmail.toLowerCase().includes(userFilter.toLowerCase());
@@ -1025,11 +1107,11 @@ const EVENT_TYPE_LABELS: Record<string, { label: string; color: string; bg: stri
   error: { label: "Erro", color: "#ef4444", bg: "rgba(239,68,68,0.08)" },
 };
 
-function LogsTab() {
+function LogsTab({ initialTypeFilter, onTypeFilterConsumed }: { initialTypeFilter?: string; onTypeFilterConsumed?: () => void }) {
   const [logs, setLogs] = useState<AdminLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [typeFilter, setTypeFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState(initialTypeFilter ?? "");
 
   const fetchLogs = useCallback(async (eventType?: string) => {
     setLoading(true);
@@ -1040,7 +1122,15 @@ function LogsTab() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchLogs(); }, [fetchLogs]);
+  useEffect(() => { fetchLogs(initialTypeFilter || undefined); }, [fetchLogs]);
+
+  useEffect(() => {
+    if (initialTypeFilter !== undefined) {
+      setTypeFilter(initialTypeFilter);
+      if (initialTypeFilter) fetchLogs(initialTypeFilter);
+      onTypeFilterConsumed?.();
+    }
+  }, [initialTypeFilter]);
 
   function handleFilterChange(t: string) {
     setTypeFilter(t);
