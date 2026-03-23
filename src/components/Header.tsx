@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Menu, LogOut, Bell, Sun, Moon } from "lucide-react";
+import { LogOut, Bell, Sun, Moon } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import NotificationsPanel from "./NotificationsPanel";
@@ -14,7 +14,6 @@ interface HeaderProps {
 }
 
 export default function Header({
-  onToggleSidebar,
   notifications,
   onMarkNotificationRead,
   onMarkAllNotificationsRead,
@@ -38,15 +37,6 @@ export default function Header({
         boxShadow: "0 1px 8px var(--color-header-shadow)",
       }}
     >
-      <button
-        onClick={onToggleSidebar}
-        className="p-2 rounded-lg transition-all"
-        style={{ color: "var(--color-fg-muted)" }}
-        title="Alternar menu"
-      >
-        <Menu className="w-4 h-4" />
-      </button>
-
       <div className="flex-1" />
 
       <div className="relative">

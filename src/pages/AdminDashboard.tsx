@@ -199,6 +199,7 @@ export default function AdminDashboard() {
         activeSection={activeSection}
         onSectionChange={(s) => setActiveSection(s as AdminSection)}
         collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         isAdmin
       />
       <Header

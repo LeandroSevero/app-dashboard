@@ -138,6 +138,7 @@ export default function Dashboard() {
         activeSection={activeSection}
         onSectionChange={setActiveSection}
         collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         profileCompletion={profileCompletion}
       />
       <Header
