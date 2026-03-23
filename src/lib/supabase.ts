@@ -8,18 +8,11 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 (window as any).supabase = supabase;
 
 export async function getValidToken(): Promise<string | null> {
+  const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+  if (!refreshError && refreshed.session?.access_token) {
+    return refreshed.session.access_token;
+  }
   const { data: sessionData } = await supabase.auth.getSession();
-  if (sessionData.session?.access_token) {
-    const expiresAt = sessionData.session.expires_at ?? 0;
-    const now = Math.floor(Date.now() / 1000);
-    if (expiresAt - now > 60) {
-      return sessionData.session.access_token;
-    }
-  }
-  const { data, error } = await supabase.auth.refreshSession();
-  if (!error && data.session?.access_token) {
-    return data.session.access_token;
-  }
   return sessionData.session?.access_token ?? null;
 }
 
