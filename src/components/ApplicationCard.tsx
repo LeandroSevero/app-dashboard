@@ -66,9 +66,11 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
     }
   }
 
-  const typeLabel = app.type === "lavinmq" ? "LavinMQ" : "RabbitMQ";
+  const typeLabel = app.type === "lavinmq" ? "LavinMQ" : app.type === "mongodb" ? "MongoDB" : "RabbitMQ";
   const typeBadgeStyle = app.type === "lavinmq"
     ? { color: '#06b6d4', background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.2)' }
+    : app.type === "mongodb"
+    ? { color: '#22c55e', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)' }
     : { color: '#f97316', background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.2)' };
 
   const createdDate = new Date(app.created_at).toLocaleDateString("pt-BR", {
@@ -96,6 +98,8 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
             >
               {app.type === "lavinmq" ? (
                 <img src="/LavinMQ.svg" alt="LavinMQ" className="w-5 h-5" />
+              ) : app.type === "mongodb" ? (
+                <img src="/mongodb.svg" alt="MongoDB" className="w-5 h-5" />
               ) : (
                 <img src="/RabbitMQ.svg" alt="RabbitMQ" className="w-5 h-5" />
               )}
@@ -131,57 +135,87 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
           </div>
         </div>
 
-        <div className="mb-3">
-          <p className="text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--color-fg-muted)' }}>Conexão do Painel Web</p>
-          <div className="space-y-2">
-            <CredentialRow label="Hostname" value={mqttHostname} field="mqtt_host" copiedField={copiedField} onCopy={copyToClipboard} />
-            <CredentialRow
-              label="Portas"
-              value={`${app.mqtt_port ?? 1883} (${app.mqtt_port_tls ?? 8883} TLS)`}
-              field="mqtt_ports"
-              copiedField={copiedField}
-              onCopy={copyToClipboard}
-            />
-            <CredentialRow label="Usuário" value={mqttUsername} field="mqtt_user" copiedField={copiedField} onCopy={copyToClipboard} />
-            <PasswordRow
-              label="Senha"
-              value={mqttPassword}
-              field="mqtt_pass"
-              show={showMqttPassword}
-              onToggleShow={() => setShowMqttPassword(!showMqttPassword)}
-              copiedField={copiedField}
-              onCopy={copyToClipboard}
-            />
+        {app.type === "mongodb" ? (
+          <div className="mb-3">
+            <p className="text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--color-fg-muted)' }}>Conexão</p>
+            <div className="space-y-2">
+              <PasswordRow
+                label="Connection"
+                value={app.connection_url || ""}
+                field="connection_url"
+                show={showPassword}
+                onToggleShow={() => setShowPassword(!showPassword)}
+                copiedField={copiedField}
+                onCopy={copyToClipboard}
+              />
+              <CredentialRow label="Database" value={app.mongo_db || ""} field="mongo_db" copiedField={copiedField} onCopy={copyToClipboard} />
+              <CredentialRow label="Usuário" value={app.mongo_user || ""} field="mongo_user" copiedField={copiedField} onCopy={copyToClipboard} />
+              <PasswordRow
+                label="Senha"
+                value={app.mongo_password || ""}
+                field="mongo_password"
+                show={showMqttPassword}
+                onToggleShow={() => setShowMqttPassword(!showMqttPassword)}
+                copiedField={copiedField}
+                onCopy={copyToClipboard}
+              />
+            </div>
           </div>
-        </div>
+        ) : (
+          <>
+            <div className="mb-3">
+              <p className="text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--color-fg-muted)' }}>Conexão do Painel Web</p>
+              <div className="space-y-2">
+                <CredentialRow label="Hostname" value={mqttHostname} field="mqtt_host" copiedField={copiedField} onCopy={copyToClipboard} />
+                <CredentialRow
+                  label="Portas"
+                  value={`${app.mqtt_port ?? 1883} (${app.mqtt_port_tls ?? 8883} TLS)`}
+                  field="mqtt_ports"
+                  copiedField={copiedField}
+                  onCopy={copyToClipboard}
+                />
+                <CredentialRow label="Usuário" value={mqttUsername} field="mqtt_user" copiedField={copiedField} onCopy={copyToClipboard} />
+                <PasswordRow
+                  label="Senha"
+                  value={mqttPassword}
+                  field="mqtt_pass"
+                  show={showMqttPassword}
+                  onToggleShow={() => setShowMqttPassword(!showMqttPassword)}
+                  copiedField={copiedField}
+                  onCopy={copyToClipboard}
+                />
+              </div>
+            </div>
 
-        <button
-          onClick={() => setShowMqtt(!showMqtt)}
-          className="w-full flex items-center justify-between py-2 px-3 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all"
-          style={{
-            background: showMqtt ? 'var(--color-bg-secondary)' : 'transparent',
-            color: 'var(--color-fg-muted)',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          <span>Conexão da Aplicação</span>
-          {showMqtt ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-        </button>
+            <button
+              onClick={() => setShowMqtt(!showMqtt)}
+              className="w-full flex items-center justify-between py-2 px-3 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all"
+              style={{
+                background: showMqtt ? 'var(--color-bg-secondary)' : 'transparent',
+                color: 'var(--color-fg-muted)',
+                border: '1px solid var(--color-border)',
+              }}
+            >
+              <span>Conexão da Aplicação</span>
+              {showMqtt ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
 
-        {showMqtt && (
-          <div className="mt-2 space-y-2">
-            <CredentialRow label="URL" value={app.amqp_url} field="url" copiedField={copiedField} onCopy={copyToClipboard} />
-            <CredentialRow label="Usuário" value={app.username} field="username" copiedField={copiedField} onCopy={copyToClipboard} />
-            <PasswordRow
-              label="Senha"
-              value={app.password}
-              field="password"
-              show={showPassword}
-              onToggleShow={() => setShowPassword(!showPassword)}
-              copiedField={copiedField}
-              onCopy={copyToClipboard}
-            />
-          </div>
+            {showMqtt && (
+              <div className="mt-2 space-y-2">
+                <CredentialRow label="URL" value={app.amqp_url} field="url" copiedField={copiedField} onCopy={copyToClipboard} />
+                <CredentialRow label="Usuário" value={app.username} field="username" copiedField={copiedField} onCopy={copyToClipboard} />
+                <PasswordRow
+                  label="Senha"
+                  value={app.password}
+                  field="password"
+                  show={showPassword}
+                  onToggleShow={() => setShowPassword(!showPassword)}
+                  copiedField={copiedField}
+                  onCopy={copyToClipboard}
+                />
+              </div>
+            )}
+          </>
         )}
       </div>
 

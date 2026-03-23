@@ -8,6 +8,7 @@ export interface Application {
   cloudamqp_id: string;
   panel_url: string;
   created_at: string;
+  user_id?: string;
   mqtt_hostname?: string;
   mqtt_username?: string;
   mqtt_password?: string;

@@ -14,6 +14,7 @@ function mapRow(row: Record<string, unknown>): Application {
     cloudamqp_id: (row.cloudamqp_id as string) || "",
     panel_url: (row.panel_url as string) || "",
     created_at: row.created_at as string,
+    user_id: (row.user_id as string) || undefined,
     mqtt_hostname: (row.mqtt_host as string) || undefined,
     mqtt_username: (row.mqtt_user as string) || undefined,
     mqtt_password: (row.mqtt_password as string) || undefined,

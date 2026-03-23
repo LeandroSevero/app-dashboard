@@ -28,6 +28,7 @@ import {
   Activity,
   Clock,
   Filter,
+  LayoutGrid,
 } from "lucide-react";
 import Header from "../components/Header";
 import Sidebar from "../components/Sidebar";
@@ -49,6 +50,7 @@ import {
 } from "../lib/api";
 import type { AdminStats, AdminLog } from "../services/adminService";
 import type { AdminUser, Application } from "../types/database";
+import { useAuth } from "../context/AuthContext";
 
 type AdminSection =
   | "admin-dashboard"
@@ -60,6 +62,7 @@ type AdminSection =
   | "admin-settings";
 
 export default function AdminDashboard() {
+  const { user } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeSection, setActiveSection] = useState<AdminSection>("admin-dashboard");
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -177,6 +180,7 @@ export default function AdminDashboard() {
               onRefresh={fetchMyApps}
               onOpenCreate={() => setShowCreateModal(true)}
               onViewDetails={setDetailApp}
+              currentUserId={user?.id}
             />
           )}
 
@@ -394,9 +398,16 @@ interface MyApplicationsSectionProps {
   onRefresh: () => void;
   onOpenCreate: () => void;
   onViewDetails: (app: Application) => void;
+  currentUserId?: string;
 }
 
-function MyApplicationsSection({ apps, loading, deletingId, onDelete, onRefresh, onOpenCreate, onViewDetails }: MyApplicationsSectionProps) {
+function MyApplicationsSection({ apps, loading, deletingId, onDelete, onRefresh, onOpenCreate, onViewDetails, currentUserId }: MyApplicationsSectionProps) {
+  const [showAll, setShowAll] = useState(false);
+
+  const displayedApps = showAll || !currentUserId
+    ? apps
+    : apps.filter((a) => a.user_id === currentUserId);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -405,6 +416,17 @@ function MyApplicationsSection({ apps, loading, deletingId, onDelete, onRefresh,
           <p className="text-sm mt-1" style={{ color: 'var(--color-fg-muted)' }}>Suas instâncias pessoais.</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowAll(!showAll)}
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl transition-all"
+            style={showAll
+              ? { background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 25%, transparent)' }
+              : { color: 'var(--color-fg-muted)', border: '1px solid var(--color-border)', background: 'transparent' }
+            }
+          >
+            <LayoutGrid className="w-3.5 h-3.5" />
+            {showAll ? "Somente minhas" : "Mostrar todas"}
+          </button>
           <button onClick={onRefresh} className="p-2 rounded-xl transition-all" style={{ color: 'var(--color-fg-muted)', border: '1px solid var(--color-border)' }}>
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
@@ -415,11 +437,21 @@ function MyApplicationsSection({ apps, loading, deletingId, onDelete, onRefresh,
         </div>
       </div>
 
+      {!showAll && currentUserId && apps.some((a) => a.user_id !== currentUserId) && (
+        <div
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs"
+          style={{ background: 'color-mix(in srgb, var(--color-primary) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 15%, transparent)', color: 'var(--color-fg-muted)' }}
+        >
+          <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--color-primary)' }} />
+          Mostrando apenas suas aplicações. Clique em <strong style={{ color: 'var(--color-primary)' }}>"Mostrar todas"</strong> para ver as de todos os usuários.
+        </div>
+      )}
+
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--color-fg-muted)' }} />
         </div>
-      ) : apps.length === 0 ? (
+      ) : displayedApps.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}>
             <Server className="w-6 h-6" style={{ color: 'var(--color-fg-muted)' }} />
@@ -433,7 +465,7 @@ function MyApplicationsSection({ apps, loading, deletingId, onDelete, onRefresh,
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {apps.map((app) => (
+          {displayedApps.map((app) => (
             <ApplicationCard
               key={app.id}
               app={app}

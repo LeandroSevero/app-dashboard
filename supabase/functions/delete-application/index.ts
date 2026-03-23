@@ -10,9 +10,9 @@ const corsHeaders = {
 const CLOUDAMQP_API_KEY = Deno.env.get("CLOUDAMQP_API_KEY") || "";
 const CLOUDAMQP_API_URL = "https://customer.cloudamqp.com/api";
 
-const ATLAS_PUBLIC_KEY = Deno.env.get("Public_Key") || "";
-const ATLAS_PRIVATE_KEY = Deno.env.get("Private_Key") || "";
-const ATLAS_PROJECT_ID = Deno.env.get("Project_ID") || "";
+const ATLAS_PUBLIC_KEY = (Deno.env.get("Public_Key") || "").trim();
+const ATLAS_PRIVATE_KEY = (Deno.env.get("Private_Key") || "").trim();
+const ATLAS_PROJECT_ID = (Deno.env.get("Project_ID") || "").trim();
 const ATLAS_BASE_URL = "https://cloud.mongodb.com/api/atlas/v2";
 
 async function md5(message: string): Promise<string> {
@@ -143,11 +143,12 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const query = supabase
+    let query = supabase
       .from("applications")
       .select("id, type, cloudamqp_id, mongo_user, user_id")
-      .eq("id", appId);
-    if (!isAdmin) query.eq("user_id", user.id);
+      .eq("id", appId)
+      .is("deleted_at", null);
+    if (!isAdmin) query = query.eq("user_id", user.id);
 
     const { data: app, error: fetchError } = await query.maybeSingle();
     if (fetchError || !app) {
