@@ -111,7 +111,7 @@ export default function NotificationsPanel({ notifications, onClose, onMarkRead,
                 key={notif.id}
                 onClick={() => {
                   if (!notif.read) onMarkRead(notif.id);
-                  if (notif.meta?.event_type === "app_deleted" && onNotificationClick) {
+                  if (onNotificationClick) {
                     onNotificationClick(notif);
                   }
                 }}
@@ -119,7 +119,7 @@ export default function NotificationsPanel({ notifications, onClose, onMarkRead,
                 style={{
                   background: notif.read ? "transparent" : "color-mix(in srgb, var(--color-primary) 10%, var(--color-card-solid))",
                   borderBottom: "1px solid var(--color-border)",
-                  cursor: (notif.meta?.event_type === "app_deleted" && onNotificationClick) || !notif.read ? "pointer" : "default",
+                  cursor: "pointer",
                 }}
               >
                 <div

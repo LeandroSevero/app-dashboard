@@ -150,11 +150,9 @@ export default function Dashboard() {
         onMarkNotificationRead={handleMarkNotificationRead}
         onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
         onNotificationClick={(notif) => {
-          if (notif.meta?.event_type === "app_deleted") {
-            const appName = (notif.meta.app_name as string) ?? "";
-            setAppsInitialFilter(appName);
-            setActiveSection("applications");
-          }
+          const appName = (notif.meta?.app_name as string) ?? "";
+          setAppsInitialFilter(appName);
+          setActiveSection("applications");
         }}
       />
 
