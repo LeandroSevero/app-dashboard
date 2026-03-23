@@ -46,9 +46,10 @@ export default function NotificationsPanel({ notifications, onClose, onMarkRead,
       ref={panelRef}
       className="absolute right-0 top-full mt-2 w-96 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col"
       style={{
-        background: "var(--color-card)",
+        background: "var(--color-card-solid)",
         border: "1px solid var(--color-border)",
         maxHeight: "480px",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.35)",
       }}
     >
       <div
@@ -110,7 +111,7 @@ export default function NotificationsPanel({ notifications, onClose, onMarkRead,
                 onClick={() => !notif.read && onMarkRead(notif.id)}
                 className="w-full text-left px-4 py-3 transition-all flex gap-3"
                 style={{
-                  background: notif.read ? "transparent" : "color-mix(in srgb, var(--color-primary) 4%, transparent)",
+                  background: notif.read ? "transparent" : "color-mix(in srgb, var(--color-primary) 10%, var(--color-card-solid))",
                   borderBottom: "1px solid var(--color-border)",
                   cursor: notif.read ? "default" : "pointer",
                 }}
