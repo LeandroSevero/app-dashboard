@@ -1,5 +1,4 @@
 import { invokeWithAuth } from "../lib/supabase";
-import { supabase } from "../lib/supabase";
 import type { ApiResponse } from "../types/api";
 import type { AdminUser } from "../types/database";
 import { logEvent } from "./logService";
@@ -88,12 +87,9 @@ export async function updateUser(
 
 export async function deleteUser(userId: string): Promise<ApiResponse> {
   try {
-    const { error } = await supabase
-      .from("profiles")
-      .delete()
-      .eq("id", userId);
-
+    const { data, error } = await invokeWithAuth("delete-user", { userId });
     if (error) return { success: false, error: error.message };
+    if ((data as Record<string, unknown>)?.error) return { success: false, error: (data as Record<string, unknown>).error as string };
     return { success: true };
   } catch {
     return { success: false, error: "Erro de conexão" };
