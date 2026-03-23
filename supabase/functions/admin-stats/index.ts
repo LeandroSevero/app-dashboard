@@ -43,8 +43,8 @@ Deno.serve(async (req: Request) => {
 
     if (callerProfile?.role !== "admin") return json({ error: "Acesso negado" }, 403);
 
-    const [profilesRes, allAppsRes, activeAppsRes, limitsRes, eventsRes, authUsersRes] = await Promise.all([
-      supabase.from("profiles").select("id, role, created_at, name"),
+    const [activeProfilesRes, allAppsRes, activeAppsRes, limitsRes, eventsRes, authUsersRes] = await Promise.all([
+      supabase.from("profiles").select("id, role, created_at, name").is("deleted_at", null),
       supabase.from("applications").select("id, type, created_at, user_id"),
       supabase.from("applications").select("id, type, created_at, user_id").is("deleted_at", null),
       supabase.from("user_limits").select("user_id, app_type, max_apps"),
@@ -52,16 +52,16 @@ Deno.serve(async (req: Request) => {
       supabase.rpc("get_all_auth_users"),
     ]);
 
-    const profiles = profilesRes.data || [];
+    const activeProfiles = activeProfilesRes.data || [];
     const allApps = allAppsRes.data || [];
     const activeApps = activeAppsRes.data || [];
     const limits = limitsRes.data || [];
     const events = eventsRes.data || [];
     const authUsers = authUsersRes.data || [];
 
-    const profilesMap = new Map(profiles.map((p: { id: string; name: string }) => [p.id, p]));
+    const profilesMap = new Map(activeProfiles.map((p: { id: string; name: string }) => [p.id, p]));
 
-    const totalUserCount = profiles.length;
+    const totalUserCount = activeProfiles.length;
     const capacityByType: Record<string, number> = {
       rabbitmq: totalUserCount,
       lavinmq: totalUserCount,
@@ -73,8 +73,8 @@ Deno.serve(async (req: Request) => {
       return acc;
     }, {});
 
-    const totalUsers = profiles.length;
-    const totalAdmins = profiles.filter((p: { role: string }) => p.role === "admin").length;
+    const totalUsers = activeProfiles.length;
+    const totalAdmins = activeProfiles.filter((p: { role: string }) => p.role === "admin").length;
     const totalApps = activeApps.length;
 
     const byType = usedByType;
@@ -103,7 +103,7 @@ Deno.serve(async (req: Request) => {
         const d = new Date(now - i * 86400000);
         days[d.toISOString().slice(0, 10)] = 0;
       }
-      const usersSource = authUsers.length > 0 ? authUsers : profiles;
+      const usersSource = authUsers.length > 0 ? authUsers : activeProfiles;
       for (const u of usersSource) {
         const day = (u.created_at as string).slice(0, 10);
         if (day in days) days[day]++;

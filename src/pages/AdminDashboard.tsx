@@ -123,7 +123,9 @@ export default function AdminDashboard() {
   }
 
   function handleUserDeleted(userId: string) {
-    setUsers((prev) => prev.filter((u) => u.id !== userId));
+    setUsers((prev) =>
+      prev.map((u) => u.id === userId ? { ...u, deleted_at: new Date().toISOString() } : u)
+    );
   }
 
   function handleAppUpdated(appId: string, updates: Partial<Application>) {
@@ -713,6 +715,11 @@ function UserProfileRow({ user, editing, onEditStart, onEditEnd, deleting, onDel
   const [confirmDelete, setConfirmDelete] = useState(false);
   const initials = (user.full_name || user.email).substring(0, 2).toUpperCase();
 
+  const activeApps = user.applications.filter((a) => !a.deleted_at);
+  const rabbitmqCount = activeApps.filter((a) => a.type === "rabbitmq").length;
+  const lavinmqCount = activeApps.filter((a) => a.type === "lavinmq").length;
+  const mongodbCount = activeApps.filter((a) => a.type === "mongodb").length;
+
   return (
     <div>
       <div className="flex items-center gap-4 px-6 py-4">
@@ -746,37 +753,70 @@ function UserProfileRow({ user, editing, onEditStart, onEditEnd, deleting, onDel
             )}
           </div>
           <p className="text-xs mt-0.5" style={{ color: 'var(--color-fg-muted)' }}>{user.email}</p>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--color-border2)' }}>
-            {user.deleted_at
-              ? `Excluído em ${new Date(user.deleted_at).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric' })}`
-              : `${user.applications.length} ${user.applications.length === 1 ? "aplicação" : "aplicações"}`
-            }
-          </p>
+          {user.deleted_at ? (
+            <p className="text-xs mt-0.5" style={{ color: 'var(--color-border2)' }}>
+              Excluído em {new Date(user.deleted_at).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric' })}
+            </p>
+          ) : (
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              {activeApps.length === 0 ? (
+                <span className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>Nenhuma aplicação</span>
+              ) : (
+                <>
+                  {rabbitmqCount > 0 && (
+                    <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-md font-medium" style={{ background: 'rgba(249,115,22,0.08)', color: '#f97316', border: '1px solid rgba(249,115,22,0.2)' }}>
+                      <img src="/RabbitMQ.svg" className="w-3 h-3" />
+                      {rabbitmqCount}
+                    </span>
+                  )}
+                  {lavinmqCount > 0 && (
+                    <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-md font-medium" style={{ background: 'rgba(6,182,212,0.08)', color: '#06b6d4', border: '1px solid rgba(6,182,212,0.2)' }}>
+                      <img src="/LavinMQ.svg" className="w-3 h-3" />
+                      {lavinmqCount}
+                    </span>
+                  )}
+                  {mongodbCount > 0 && (
+                    <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-md font-medium" style={{ background: 'rgba(34,197,94,0.08)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.2)' }}>
+                      <img src="/mongodb.svg" className="w-3 h-3" />
+                      {mongodbCount}
+                    </span>
+                  )}
+                  <span className="text-xs" style={{ color: 'var(--color-border2)' }}>
+                    {activeApps.length} {activeApps.length === 1 ? "total" : "total"}
+                  </span>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          <button onClick={onEditStart} className="p-1.5 rounded-lg transition-all" style={{ color: 'var(--color-fg-muted)' }} title="Editar usuário">
-            <KeyRound className="w-3.5 h-3.5" />
-          </button>
-          {confirmDelete ? (
-            <div className="flex items-center gap-1">
-              <span className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>Confirmar?</span>
-              <button onClick={() => { onDelete(); setConfirmDelete(false); }} disabled={deleting} className="p-1.5 rounded-lg disabled:opacity-50" style={{ color: '#ef4444' }}>
-                {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-              </button>
-              <button onClick={() => setConfirmDelete(false)} className="p-1.5 rounded-lg" style={{ color: 'var(--color-fg-muted)' }}>
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ) : (
-            <button onClick={() => setConfirmDelete(true)} disabled={user.role === "admin"} className="p-1.5 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed" style={{ color: 'var(--color-fg-muted)' }} title={user.role === "admin" ? "Não é possível excluir admins" : "Excluir usuário"}>
-              <Trash2 className="w-3.5 h-3.5" />
+          {!user.deleted_at && (
+            <button onClick={onEditStart} className="p-1.5 rounded-lg transition-all" style={{ color: 'var(--color-fg-muted)' }} title="Editar usuário">
+              <KeyRound className="w-3.5 h-3.5" />
             </button>
+          )}
+          {!user.deleted_at && (
+            confirmDelete ? (
+              <div className="flex items-center gap-1">
+                <span className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>Confirmar?</span>
+                <button onClick={() => { onDelete(); setConfirmDelete(false); }} disabled={deleting} className="p-1.5 rounded-lg disabled:opacity-50" style={{ color: '#ef4444' }}>
+                  {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                </button>
+                <button onClick={() => setConfirmDelete(false)} className="p-1.5 rounded-lg" style={{ color: 'var(--color-fg-muted)' }}>
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => setConfirmDelete(true)} disabled={user.role === "admin"} className="p-1.5 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed" style={{ color: 'var(--color-fg-muted)' }} title={user.role === "admin" ? "Não é possível excluir admins" : "Excluir usuário"}>
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )
           )}
         </div>
       </div>
 
-      {editing && <EditUserPanel user={user} onClose={onEditEnd} onUpdated={onUserUpdated} />}
+      {editing && !user.deleted_at && <EditUserPanel user={user} onClose={onEditEnd} onUpdated={onUserUpdated} />}
     </div>
   );
 }
