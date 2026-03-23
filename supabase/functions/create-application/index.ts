@@ -200,6 +200,8 @@ async function provisionMongoInstance(userId: string): Promise<MongoInstanceDeta
   const clusterHost = await getClusterHostname();
   const connectionUrl = `mongodb+srv://${dbUser}:${encodeURIComponent(dbPassword)}@${clusterHost}/${dbName}?retryWrites=true&w=majority`;
 
+  await new Promise(resolve => setTimeout(resolve, 10000));
+
   await createDefaultCollection(connectionUrl, dbName, collectionName);
 
   return { connectionUrl, dbName, dbUser, dbPassword, collectionName };
