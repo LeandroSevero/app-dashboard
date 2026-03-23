@@ -23,9 +23,9 @@ Aplicação React + TypeScript com backend Supabase (Edge Functions + PostgreSQL
 - Modal de detalhe com todas as credenciais e estatísticas da aplicação
 
 ### Painel Admin
-- **Dashboard**: estatísticas globais (usuários, aplicações, erros), gráficos de 7 dias
+- **Dashboard**: estatísticas globais (usuários, aplicações, erros), gráficos de 7 dias (inclui registros excluídos nos totais e no gráfico de criações)
 - **Usuários**: listagem completa com e-mail, nome, perfil, aplicações e ações (editar, deletar, resetar senha)
-- **Aplicações Globais**: todas as instâncias da plataforma com filtro por tipo
+- **Aplicações Globais**: todas as instâncias da plataforma com filtro por tipo, filtro de status (ativas / ativas+excluídas / somente excluídas), coluna de data de criação e data de exclusão com badge visual "Excluída"
 - **Recursos**: visão consolidada dos recursos de infraestrutura (MongoDB Atlas, RabbitMQ, LavinMQ)
 - **Logs**: eventos recentes da plataforma com filtro por tipo
 
@@ -84,7 +84,7 @@ src/
 ```
 supabase/functions/
 ├── admin-stats/           # Estatísticas globais para o painel admin
-├── admin-users/           # Listagem de todos os usuários
+├── admin-users/           # Listagem de todos os usuários (inclui aplicações excluídas via soft delete)
 ├── admin-update-user/     # Atualização de dados de usuário (admin)
 ├── admin-update-application/  # Renomear aplicação (admin)
 ├── admin-logs/            # Logs de eventos da plataforma
