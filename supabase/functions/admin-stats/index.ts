@@ -61,7 +61,7 @@ Deno.serve(async (req: Request) => {
 
     const profilesMap = new Map(profiles.map((p: { id: string; name: string }) => [p.id, p]));
 
-    const totalUserCount = authUsers.length > 0 ? authUsers.length : profiles.length;
+    const totalUserCount = profiles.length;
     const capacityByType: Record<string, number> = {
       rabbitmq: totalUserCount,
       lavinmq: totalUserCount,

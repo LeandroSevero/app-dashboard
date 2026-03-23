@@ -169,17 +169,21 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    if (app.type === "mongodb") {
-      if (app.mongo_user) await deleteAtlasDatabaseUser(app.mongo_user);
-      if (app.mongo_db) await dropMongoDatabase(app.mongo_db);
-    } else if (app.cloudamqp_id) {
-      await deleteCloudamqpInstance(app.cloudamqp_id);
-    }
-
     await supabase
       .from("applications")
       .update({ deleted_at: new Date().toISOString() })
       .eq("id", appId);
+
+    const cleanup = async () => {
+      if (app.type === "mongodb") {
+        if (app.mongo_user) await deleteAtlasDatabaseUser(app.mongo_user);
+        if (app.mongo_db) await dropMongoDatabase(app.mongo_db);
+      } else if (app.cloudamqp_id) {
+        await deleteCloudamqpInstance(app.cloudamqp_id);
+      }
+    };
+
+    EdgeRuntime.waitUntil(cleanup());
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,

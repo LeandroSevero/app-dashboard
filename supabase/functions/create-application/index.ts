@@ -182,7 +182,7 @@ async function provisionMongoInstance(userId: string): Promise<MongoInstanceDeta
   const dbName = `app_${shortId}`;
   const dbUser = `user_${shortId}`;
   const dbPassword = generateSecurePassword(24);
-  const collectionName = dbName;
+  const collectionName = "main";
 
   await atlasPost(`/groups/${ATLAS_PROJECT_ID}/databaseUsers`, {
     databaseName: "admin",
