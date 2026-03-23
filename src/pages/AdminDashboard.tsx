@@ -979,6 +979,7 @@ function ApplicationsTab({ apps, loading, onRefresh, onAppUpdated, onAppDeleted,
   const [typeFilter, setTypeFilter] = useState(initialTypeFilter ?? "");
   const [deletedFilter, setDeletedFilter] = useState<DeletedFilter>("active");
   const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
+  const [hoveredTypeOpt, setHoveredTypeOpt] = useState<string | null>(null);
   const typeDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1031,8 +1032,8 @@ function ApplicationsTab({ apps, loading, onRefresh, onAppUpdated, onAppDeleted,
         </button>
       </div>
 
-      <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
-        <div className="px-6 py-4 space-y-3" style={{ background: 'var(--color-card)', borderBottom: '1px solid var(--color-border)' }}>
+      <div className="rounded-2xl" style={{ border: '1px solid var(--color-border)' }}>
+        <div className="px-6 py-4 space-y-3 rounded-t-2xl" style={{ background: 'var(--color-card)', borderBottom: '1px solid var(--color-border)' }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Boxes className="w-4 h-4" style={{ color: 'var(--color-fg-muted)' }} />
@@ -1084,10 +1085,14 @@ function ApplicationsTab({ apps, loading, onRefresh, onAppUpdated, onAppDeleted,
                       key={opt.value}
                       type="button"
                       onClick={() => { setTypeFilter(opt.value); setTypeDropdownOpen(false); }}
-                      className="w-full text-left px-3 py-2 text-sm transition-colors hover:bg-white/5"
+                      onMouseEnter={() => setHoveredTypeOpt(opt.value)}
+                      onMouseLeave={() => setHoveredTypeOpt(null)}
+                      className="w-full text-left px-3 py-2 text-sm transition-colors"
                       style={typeFilter === opt.value
-                        ? { background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)', color: 'var(--color-primary)' }
-                        : { color: 'var(--color-fg)', background: 'transparent' }
+                        ? { background: hoveredTypeOpt === opt.value ? 'color-mix(in srgb, var(--color-primary) 20%, transparent)' : 'color-mix(in srgb, var(--color-primary) 12%, transparent)', color: 'var(--color-primary)' }
+                        : hoveredTypeOpt === opt.value
+                          ? { background: 'rgba(255,255,255,0.06)', color: 'var(--color-fg)' }
+                          : { color: 'var(--color-fg)', background: 'transparent' }
                       }
                     >
                       {opt.label}
