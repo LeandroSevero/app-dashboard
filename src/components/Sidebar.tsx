@@ -69,20 +69,26 @@ export default function Sidebar({ activeSection, onSectionChange, collapsed, onT
         className={`flex items-center gap-3 px-4 py-4 ${collapsed ? "justify-center" : ""}`}
         style={{ borderBottom: '1px solid var(--color-border)' }}
       >
-        {collapsed ? (
-          <img
-            src="/Green_and_Black_Minimal_Code_Search_Logo_(1).svg"
-            alt="Logo"
-            className="w-8 h-8 object-contain flex-shrink-0"
-          />
-        ) : (
-          <img
-            src="/Green_and_Black_Minimal_Code_Search_Logo_(1).svg"
-            alt="Logo"
-            className="h-8 object-contain flex-shrink-0"
-            style={{ maxWidth: '140px' }}
-          />
-        )}
+        <button
+          onClick={() => onSectionChange(isAdmin ? "admin-dashboard" : "dashboard")}
+          className="flex items-center focus:outline-none"
+          title="Dashboard"
+        >
+          {collapsed ? (
+            <img
+              src="/Green_and_Black_Minimal_Code_Search_Logo_(1).svg"
+              alt="Logo"
+              className="w-8 h-8 object-contain flex-shrink-0"
+            />
+          ) : (
+            <img
+              src="/Green_and_Black_Minimal_Code_Search_Logo_(1).svg"
+              alt="Logo"
+              className="h-8 object-contain flex-shrink-0"
+              style={{ maxWidth: '140px' }}
+            />
+          )}
+        </button>
       </div>
 
       <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
