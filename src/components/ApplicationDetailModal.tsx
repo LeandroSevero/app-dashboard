@@ -366,10 +366,12 @@ interface CollectionDetail {
 
 function MongoExplorer({ app }: { app: Application }) {
   const [collections, setCollections] = useState<MongoCollection[]>([]);
+  const [dbName, setDbName] = useState<string>(app.mongo_db || "");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCol, setSelectedCol] = useState<string | null>(null);
   const [colDetail, setColDetail] = useState<CollectionDetail | null>(null);
+  const [colError, setColError] = useState<string | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [expandedDoc, setExpandedDoc] = useState<string | null>(null);
 
@@ -377,10 +379,14 @@ function MongoExplorer({ app }: { app: Application }) {
     setLoading(true);
     setError(null);
     const { data, error: err } = await invokeWithAuth("mongo-explorer", { appId: app.id });
-    if (err || (data as Record<string, unknown>)?.error) {
-      setError((data as Record<string, unknown>)?.error as string || "Erro ao carregar collections");
+    const d = data as Record<string, unknown> | null;
+    if (err) {
+      setError(err.message || "Erro ao conectar ao explorador");
+    } else if (d?.error) {
+      setError(d.error as string);
     } else {
-      setCollections(((data as Record<string, unknown>)?.collections as MongoCollection[]) || []);
+      setCollections((d?.collections as MongoCollection[]) || []);
+      if (d?.database) setDbName(d.database as string);
     }
     setLoading(false);
   }, [app.id]);
@@ -389,10 +395,14 @@ function MongoExplorer({ app }: { app: Application }) {
     setSelectedCol(name);
     setLoadingDetail(true);
     setColDetail(null);
+    setColError(null);
     setExpandedDoc(null);
     const { data, error: err } = await invokeWithAuth("mongo-explorer", { appId: app.id, collection: name });
-    if (err || (data as Record<string, unknown>)?.error) {
-      setColDetail(null);
+    const d = data as Record<string, unknown> | null;
+    if (err) {
+      setColError(err.message || "Erro ao carregar collection");
+    } else if (d?.error) {
+      setColError(d.error as string);
     } else {
       setColDetail(data as CollectionDetail);
     }
@@ -403,18 +413,18 @@ function MongoExplorer({ app }: { app: Application }) {
 
   return (
     <div className="flex h-full" style={{ minHeight: "360px" }}>
-      {/* Sidebar — collection list */}
-      <div className="w-52 flex-shrink-0 flex flex-col" style={{ borderRight: "1px solid var(--color-border)" }}>
-        <div className="flex items-center justify-between px-3 py-2.5 flex-shrink-0" style={{ borderBottom: "1px solid var(--color-border)" }}>
-          <div className="flex items-center gap-1.5">
-            <Database className="w-3.5 h-3.5" style={{ color: "#22c55e" }} />
-            <span className="text-xs font-semibold truncate max-w-[100px]" style={{ color: "var(--color-fg)" }}>{app.mongo_db}</span>
+      <div className="w-56 flex-shrink-0 flex flex-col" style={{ borderRight: "1px solid var(--color-border)" }}>
+        <div className="flex items-center justify-between px-3 py-2.5 flex-shrink-0" style={{ borderBottom: "1px solid var(--color-border)", background: "var(--color-bg-secondary)" }}>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Database className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#22c55e" }} />
+            <span className="text-xs font-semibold truncate" style={{ color: "var(--color-fg)" }}>{dbName || app.mongo_db || "database"}</span>
           </div>
           <button
             onClick={loadCollections}
             disabled={loading}
-            className="p-1 rounded"
+            className="p-1 rounded ml-1 flex-shrink-0"
             style={{ color: "var(--color-fg-muted)", outline: "none" }}
+            title="Atualizar"
           >
             <RefreshCw className={`w-3 h-3 ${loading ? "animate-spin" : ""}`} />
           </button>
@@ -423,16 +433,25 @@ function MongoExplorer({ app }: { app: Application }) {
         <div className="flex-1 overflow-y-auto py-1">
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <RefreshCw className="w-4 h-4 animate-spin" style={{ color: "var(--color-fg-muted)" }} />
+              <Loader2 className="w-4 h-4 animate-spin" style={{ color: "var(--color-fg-muted)" }} />
             </div>
           ) : error ? (
-            <div className="px-3 py-3">
-              <p className="text-xs" style={{ color: "#ef4444" }}>{error}</p>
+            <div className="px-3 py-4 flex flex-col items-center gap-2 text-center">
+              <AlertCircle className="w-5 h-5" style={{ color: "#ef4444" }} />
+              <p className="text-xs leading-relaxed" style={{ color: "#ef4444" }}>{error}</p>
+              <button
+                onClick={loadCollections}
+                className="text-xs px-2 py-1 rounded-md mt-1"
+                style={{ border: "1px solid var(--color-border)", color: "var(--color-fg-muted)", outline: "none" }}
+              >
+                Tentar novamente
+              </button>
             </div>
           ) : collections.length === 0 ? (
-            <div className="px-3 py-4 text-center">
-              <Layers className="w-5 h-5 mx-auto mb-1.5" style={{ color: "var(--color-fg-muted)" }} />
-              <p className="text-xs" style={{ color: "var(--color-fg-muted)" }}>Nenhuma collection</p>
+            <div className="px-3 py-6 text-center">
+              <Layers className="w-5 h-5 mx-auto mb-2" style={{ color: "var(--color-fg-muted)" }} />
+              <p className="text-xs font-medium" style={{ color: "var(--color-fg-muted)" }}>Nenhuma collection</p>
+              <p className="text-xs mt-1" style={{ color: "var(--color-fg-muted)", opacity: 0.6 }}>O database está vazio</p>
             </div>
           ) : (
             collections.map((col) => (
@@ -448,38 +467,48 @@ function MongoExplorer({ app }: { app: Application }) {
               >
                 <Table className="w-3 h-3 flex-shrink-0" style={{ color: selectedCol === col.name ? "var(--color-primary)" : "var(--color-fg-muted)" }} />
                 <span className="text-xs truncate flex-1" style={{ color: selectedCol === col.name ? "var(--color-primary)" : "var(--color-fg)" }}>{col.name}</span>
-                <span className="text-xs font-mono flex-shrink-0" style={{ color: "var(--color-fg-muted)" }}>{col.count}</span>
+                <span className="text-xs font-mono tabular-nums flex-shrink-0 px-1.5 py-0.5 rounded" style={{ color: "var(--color-fg-muted)", background: "var(--color-bg-secondary)", border: "1px solid var(--color-border)", fontSize: "10px" }}>{col.count}</span>
               </button>
             ))
           )}
         </div>
+
+        {!loading && !error && collections.length > 0 && (
+          <div className="px-3 py-2 flex-shrink-0" style={{ borderTop: "1px solid var(--color-border)" }}>
+            <p className="text-xs" style={{ color: "var(--color-fg-muted)" }}>{collections.length} collection{collections.length !== 1 ? "s" : ""}</p>
+          </div>
+        )}
       </div>
 
-      {/* Main — documents */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {!selectedCol ? (
           <div className="flex flex-col items-center justify-center h-full py-12 text-center px-4">
             <Terminal className="w-8 h-8 mb-3" style={{ color: "var(--color-fg-muted)" }} />
             <p className="text-sm font-medium" style={{ color: "var(--color-fg)" }}>Selecione uma collection</p>
-            <p className="text-xs mt-1" style={{ color: "var(--color-fg-muted)" }}>Clique em uma collection para explorar os documentos.</p>
+            <p className="text-xs mt-1" style={{ color: "var(--color-fg-muted)" }}>Clique em uma collection para ver os documentos.</p>
           </div>
         ) : loadingDetail ? (
           <div className="flex items-center justify-center h-full py-12">
-            <RefreshCw className="w-5 h-5 animate-spin" style={{ color: "var(--color-fg-muted)" }} />
+            <Loader2 className="w-5 h-5 animate-spin" style={{ color: "var(--color-fg-muted)" }} />
+          </div>
+        ) : colError ? (
+          <div className="flex flex-col items-center justify-center h-full py-12 text-center px-4">
+            <AlertCircle className="w-6 h-6 mb-2" style={{ color: "#ef4444" }} />
+            <p className="text-sm font-medium" style={{ color: "#ef4444" }}>Erro ao carregar documents</p>
+            <p className="text-xs mt-1" style={{ color: "var(--color-fg-muted)" }}>{colError}</p>
           </div>
         ) : colDetail ? (
           <div className="flex flex-col h-full overflow-hidden">
-            {/* Collection header */}
             <div className="flex items-center gap-3 px-4 py-2.5 flex-shrink-0" style={{ borderBottom: "1px solid var(--color-border)", background: "var(--color-bg-secondary)" }}>
               <Table className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "var(--color-primary)" }} />
               <span className="text-xs font-semibold font-mono" style={{ color: "var(--color-fg)" }}>{colDetail.collection}</span>
               <span className="ml-auto flex items-center gap-1 text-xs" style={{ color: "var(--color-fg-muted)" }}>
                 <Hash className="w-3 h-3" />
-                {colDetail.count} docs
+                {colDetail.count} doc{colDetail.count !== 1 ? "s" : ""}
+                {colDetail.count > 50 && <span style={{ opacity: 0.6 }}> (mostrando 50)</span>}
               </span>
             </div>
 
-            {/* Indexes row */}
             {colDetail.indexes.length > 0 && (
               <div className="flex items-center gap-2 px-4 py-1.5 overflow-x-auto flex-shrink-0" style={{ borderBottom: "1px solid var(--color-border)" }}>
                 <span className="text-xs flex-shrink-0" style={{ color: "var(--color-fg-muted)" }}>Índices:</span>
@@ -491,12 +520,12 @@ function MongoExplorer({ app }: { app: Application }) {
               </div>
             )}
 
-            {/* Documents */}
             <div className="flex-1 overflow-y-auto">
               {colDetail.documents.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <FileText className="w-6 h-6 mb-2" style={{ color: "var(--color-fg-muted)" }} />
-                  <p className="text-xs" style={{ color: "var(--color-fg-muted)" }}>Nenhum documento encontrado</p>
+                  <p className="text-xs font-medium" style={{ color: "var(--color-fg-muted)" }}>Nenhum documento encontrado</p>
+                  <p className="text-xs mt-1" style={{ color: "var(--color-fg-muted)", opacity: 0.6 }}>A collection está vazia</p>
                 </div>
               ) : (
                 <div className="divide-y" style={{ borderColor: "var(--color-border)" }}>
@@ -505,7 +534,7 @@ function MongoExplorer({ app }: { app: Application }) {
                     const preview = Object.entries(doc)
                       .filter(([k]) => k !== "_id")
                       .slice(0, 3)
-                      .map(([k, v]) => `${k}: ${typeof v === "object" ? "{…}" : String(v).slice(0, 24)}`)
+                      .map(([k, v]) => `${k}: ${typeof v === "object" ? "{…}" : String(v).slice(0, 30)}`)
                       .join("  ·  ");
                     return (
                       <div key={doc._id}>
