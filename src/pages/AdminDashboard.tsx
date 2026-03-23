@@ -49,9 +49,15 @@ import {
   deleteApplication,
 } from "../lib/api";
 import type { AdminStats, AdminLog } from "../services/adminService";
-import type { AdminUser, Application } from "../types/database";
+import type { AdminUser, Application, Notification } from "../types/database";
 import { useAuth } from "../context/AuthContext";
 import { invokeWithAuth } from "../lib/supabase";
+import {
+  fetchNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+  triggerExpireApplications,
+} from "../services/notificationService";
 
 type AdminSection =
   | "admin-dashboard"
@@ -63,9 +69,10 @@ type AdminSection =
   | "admin-settings";
 
 export default function AdminDashboard() {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeSection, setActiveSection] = useState<AdminSection>("admin-dashboard");
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersFetched, setUsersFetched] = useState(false);
@@ -105,6 +112,24 @@ export default function AdminDashboard() {
     setMyAppsLoading(false);
     setMyAppsFetched(true);
   }, []);
+
+  const loadNotifications = useCallback(async () => {
+    const result = await fetchNotifications();
+    if (result.success && result.data) setNotifications(result.data);
+  }, []);
+
+  useEffect(() => {
+    if (!session) return;
+    loadNotifications();
+
+    const runExpiration = async () => {
+      await triggerExpireApplications();
+      await loadNotifications();
+    };
+    runExpiration();
+    const interval = setInterval(runExpiration, 60000);
+    return () => clearInterval(interval);
+  }, [session, loadNotifications]);
 
   useEffect(() => {
     if ((activeSection === "admin-users" || activeSection === "admin-apps" || activeSection === "admin-resources" || activeSection === "admin-logs") && !usersFetched) {
@@ -176,6 +201,15 @@ export default function AdminDashboard() {
       <Header
         onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
         sidebarCollapsed={sidebarCollapsed}
+        notifications={notifications}
+        onMarkNotificationRead={async (id) => {
+          await markNotificationRead(id);
+          setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+        }}
+        onMarkAllNotificationsRead={async () => {
+          await markAllNotificationsRead();
+          setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+        }}
       />
 
       <main className={`${sidebarWidth} pt-14 transition-all duration-300 min-h-screen`}>

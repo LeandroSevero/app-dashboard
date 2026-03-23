@@ -55,3 +55,16 @@ export interface AppEvent {
   meta?: Record<string, unknown>;
   created_at: string;
 }
+
+export type NotificationType = "app_expired" | "info" | "warning" | "error";
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  title: string;
+  message: string;
+  type: NotificationType;
+  read: boolean;
+  meta?: Record<string, unknown>;
+  created_at: string;
+}

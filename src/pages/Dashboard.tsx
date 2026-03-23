@@ -17,8 +17,14 @@ import ApplicationDetailModal from "../components/ApplicationDetailModal";
 import UserProfile, { calcCompletion } from "../components/UserProfile";
 import ProfileIncompletePopup from "../components/ProfileIncompletePopup";
 import { listApplications, createApplication, deleteApplication } from "../lib/api";
+import {
+  fetchNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+  triggerExpireApplications,
+} from "../services/notificationService";
 import { useAuth } from "../context/AuthContext";
-import type { Application, UserProfile as UserProfileType } from "../types/database";
+import type { Application, UserProfile as UserProfileType, Notification } from "../types/database";
 
 export default function Dashboard() {
   const { session } = useAuth();
@@ -31,9 +37,18 @@ export default function Dashboard() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [detailApp, setDetailApp] = useState<Application | null>(null);
 
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
   const [profileCompletion, setProfileCompletion] = useState(100);
   const [showProfilePopup, setShowProfilePopup] = useState(false);
   const [popupDismissed, setPopupDismissed] = useState(false);
+
+  const loadNotifications = useCallback(async () => {
+    const result = await fetchNotifications();
+    if (result.success && result.data) {
+      setNotifications(result.data);
+    }
+  }, []);
 
   const fetchApplications = useCallback(async () => {
     setLoadingApps(true);
@@ -45,10 +60,25 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    if (session) {
-      fetchApplications();
-    }
-  }, [session, fetchApplications]);
+    if (!session) return;
+    fetchApplications();
+    loadNotifications();
+  }, [session, fetchApplications, loadNotifications]);
+
+  useEffect(() => {
+    if (!session) return;
+
+    const runExpiration = async () => {
+      await triggerExpireApplications();
+      await fetchApplications();
+      await loadNotifications();
+    };
+
+    runExpiration();
+
+    const interval = setInterval(runExpiration, 60000);
+    return () => clearInterval(interval);
+  }, [session, fetchApplications, loadNotifications]);
 
   function handleProfileLoaded(profile: UserProfileType) {
     const pct = calcCompletion(profile);
@@ -88,10 +118,22 @@ export default function Dashboard() {
     setDeletingId(null);
   }
 
+  async function handleMarkNotificationRead(id: string) {
+    await markNotificationRead(id);
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+    );
+  }
+
+  async function handleMarkAllNotificationsRead() {
+    await markAllNotificationsRead();
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  }
+
   const sidebarWidth = sidebarCollapsed ? "ml-16" : "ml-60";
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--color-bg)', color: 'var(--color-fg)' }}>
+    <div className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-fg)" }}>
       <Sidebar
         activeSection={activeSection}
         onSectionChange={setActiveSection}
@@ -101,6 +143,9 @@ export default function Dashboard() {
       <Header
         onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
         sidebarCollapsed={sidebarCollapsed}
+        notifications={notifications}
+        onMarkNotificationRead={handleMarkNotificationRead}
+        onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
       />
 
       <main className={`${sidebarWidth} pt-14 transition-all duration-300 min-h-screen`}>
@@ -119,9 +164,7 @@ export default function Dashboard() {
             />
           )}
           {activeSection === "profile" && (
-            <UserProfile
-              onProfileLoaded={handleProfileLoaded}
-            />
+            <UserProfile onProfileLoaded={handleProfileLoaded} />
           )}
         </div>
       </main>
@@ -160,12 +203,12 @@ function DashboardHome({ apps }: { apps: Application[] }) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold" style={{ color: 'var(--color-fg)' }}>Visão Geral</h1>
-        <p className="text-sm mt-1" style={{ color: 'var(--color-fg-muted)' }}>Bem-vindo ao seu painel DevOps.</p>
+        <h1 className="text-2xl font-bold" style={{ color: "var(--color-fg)" }}>Visão Geral</h1>
+        <p className="text-sm mt-1" style={{ color: "var(--color-fg-muted)" }}>Bem-vindo ao seu painel DevOps.</p>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <StatCard icon={<Package className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />} label="Total de aplicações" value={total} color="primary" />
+        <StatCard icon={<Package className="w-5 h-5" style={{ color: "var(--color-primary)" }} />} label="Total de aplicações" value={total} color="primary" />
         <StatCard icon={<img src="/RabbitMQ.svg" alt="RabbitMQ" className="w-5 h-5" />} label="RabbitMQ" value={rabbitmq} color="orange" />
         <StatCard icon={<img src="/LavinMQ.svg" alt="LavinMQ" className="w-5 h-5" />} label="LavinMQ" value={lavinmq} color="cyan" />
         <StatCard icon={<img src="/mongodb.svg" alt="MongoDB" className="w-5 h-5" />} label="MongoDB" value={mongodb} color="green" />
@@ -173,10 +216,10 @@ function DashboardHome({ apps }: { apps: Application[] }) {
 
       <div
         className="rounded-2xl p-6"
-        style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}
+        style={{ background: "var(--color-card)", border: "1px solid var(--color-border)" }}
       >
-        <h2 className="font-semibold text-sm mb-4 flex items-center gap-2" style={{ color: 'var(--color-fg)' }}>
-          <LayoutDashboard className="w-4 h-4" style={{ color: 'var(--color-fg-muted)' }} />
+        <h2 className="font-semibold text-sm mb-4 flex items-center gap-2" style={{ color: "var(--color-fg)" }}>
+          <LayoutDashboard className="w-4 h-4" style={{ color: "var(--color-fg-muted)" }} />
           Módulos disponíveis em breve
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -184,10 +227,10 @@ function DashboardHome({ apps }: { apps: Application[] }) {
             <div
               key={mod}
               className="rounded-xl px-3 py-3 text-center"
-              style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}
+              style={{ background: "var(--color-bg-secondary)", border: "1px solid var(--color-border)" }}
             >
-              <p className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>{mod}</p>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--color-border2)' }}>Em breve</p>
+              <p className="text-xs font-medium" style={{ color: "var(--color-fg-muted)" }}>{mod}</p>
+              <p className="text-xs mt-0.5" style={{ color: "var(--color-border2)" }}>Em breve</p>
             </div>
           ))}
         </div>
@@ -208,20 +251,20 @@ function StatCard({
   color: "primary" | "orange" | "cyan" | "green";
 }) {
   const borderStyle = color === "primary"
-    ? { background: 'color-mix(in srgb, var(--color-primary) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 15%, transparent)' }
+    ? { background: "color-mix(in srgb, var(--color-primary) 6%, transparent)", border: "1px solid color-mix(in srgb, var(--color-primary) 15%, transparent)" }
     : color === "orange"
-    ? { background: 'rgba(249,115,22,0.05)', border: '1px solid rgba(249,115,22,0.1)' }
+    ? { background: "rgba(249,115,22,0.05)", border: "1px solid rgba(249,115,22,0.1)" }
     : color === "green"
-    ? { background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.1)' }
-    : { background: 'rgba(6,182,212,0.05)', border: '1px solid rgba(6,182,212,0.1)' };
+    ? { background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.1)" }
+    : { background: "rgba(6,182,212,0.05)", border: "1px solid rgba(6,182,212,0.1)" };
 
   return (
     <div className="rounded-2xl p-5" style={borderStyle}>
       <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>{label}</span>
+        <span className="text-xs font-medium" style={{ color: "var(--color-fg-muted)" }}>{label}</span>
         {icon}
       </div>
-      <p className="text-3xl font-bold" style={{ color: 'var(--color-fg)' }}>{value}</p>
+      <p className="text-3xl font-bold" style={{ color: "var(--color-fg)" }}>{value}</p>
     </div>
   );
 }
@@ -251,8 +294,8 @@ function ApplicationsSection({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--color-fg)' }}>Aplicações</h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--color-fg-muted)' }}>Gerencie suas instâncias de mensageria.</p>
+          <h1 className="text-2xl font-bold" style={{ color: "var(--color-fg)" }}>Aplicações</h1>
+          <p className="text-sm mt-1" style={{ color: "var(--color-fg-muted)" }}>Gerencie suas instâncias de mensageria.</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -275,14 +318,14 @@ function ApplicationsSection({
       {error && (
         <div
           className="flex items-center gap-3 rounded-xl px-4 py-3"
-          style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}
+          style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}
         >
-          <AlertCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#ef4444' }} />
-          <p className="text-sm" style={{ color: '#ef4444' }}>{error}</p>
+          <AlertCircle className="w-4 h-4 flex-shrink-0" style={{ color: "#ef4444" }} />
+          <p className="text-sm" style={{ color: "#ef4444" }}>{error}</p>
           <button
             onClick={onRefresh}
             className="ml-auto text-xs font-medium underline underline-offset-2"
-            style={{ color: '#ef4444' }}
+            style={{ color: "#ef4444" }}
           >
             Tentar novamente
           </button>
@@ -292,8 +335,8 @@ function ApplicationsSection({
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <div className="flex flex-col items-center gap-3">
-            <RefreshCw className="w-6 h-6 animate-spin" style={{ color: 'var(--color-fg-muted)' }} />
-            <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>Carregando aplicações...</p>
+            <RefreshCw className="w-6 h-6 animate-spin" style={{ color: "var(--color-fg-muted)" }} />
+            <p className="text-sm" style={{ color: "var(--color-fg-muted)" }}>Carregando aplicações...</p>
           </div>
         </div>
       ) : applications.length === 0 && !error ? (
@@ -320,12 +363,12 @@ function EmptyState({ onOpenCreate }: { onOpenCreate: () => void }) {
     <div className="flex flex-col items-center justify-center py-20 text-center">
       <div
         className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5"
-        style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}
+        style={{ background: "var(--color-card)", border: "1px solid var(--color-border)" }}
       >
-        <Server className="w-7 h-7" style={{ color: 'var(--color-fg-muted)' }} />
+        <Server className="w-7 h-7" style={{ color: "var(--color-fg-muted)" }} />
       </div>
-      <h3 className="font-semibold text-base mb-1" style={{ color: 'var(--color-fg)' }}>Nenhuma aplicação ainda</h3>
-      <p className="text-sm max-w-xs mb-6" style={{ color: 'var(--color-fg-muted)' }}>
+      <h3 className="font-semibold text-base mb-1" style={{ color: "var(--color-fg)" }}>Nenhuma aplicação ainda</h3>
+      <p className="text-sm max-w-xs mb-6" style={{ color: "var(--color-fg-muted)" }}>
         Crie sua primeira instância de mensageria RabbitMQ, LavinMQ ou MongoDB.
       </p>
       <button
@@ -339,4 +382,4 @@ function EmptyState({ onOpenCreate }: { onOpenCreate: () => void }) {
   );
 }
 
-export { User };
+export { User, Activity };
