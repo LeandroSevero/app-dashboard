@@ -56,37 +56,6 @@ Deno.serve(async (req: Request) => {
     const { data: authUsersData, error: authUsersError } = await supabase
       .rpc("get_all_auth_users");
 
-    if (authUsersError) {
-      const { data: profiles } = await supabase.from("profiles").select("*");
-      const { data: apps } = await supabase
-        .from("applications")
-        .select("*");
-
-      const appsByUser = new Map<string, unknown[]>();
-      for (const app of apps || []) {
-        const list = appsByUser.get(app.user_id) || [];
-        list.push(mapApp(app));
-        appsByUser.set(app.user_id, list);
-      }
-
-      const users = (profiles || []).map((p) => ({
-        id: p.id,
-        email: "",
-        role: p.role || "user",
-        created_at: p.created_at,
-        full_name: p.name || "",
-        phone: p.phone || "",
-        bio: p.bio || "",
-        avatar_url: p.avatar_url || "",
-        applications: appsByUser.get(p.id) || [],
-      }));
-
-      return new Response(JSON.stringify({ users }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const { data: profiles } = await supabase.from("profiles").select("*");
     const { data: apps } = await supabase
       .from("applications")
@@ -100,13 +69,34 @@ Deno.serve(async (req: Request) => {
       appsByUser.set(app.user_id, list);
     }
 
-    const users = (authUsersData || []).map((u: { id: string; email: string; created_at: string }) => {
+    if (authUsersError || !authUsersData) {
+      const users = (profiles || []).map((p) => ({
+        id: p.id,
+        email: "",
+        role: p.role || "user",
+        created_at: p.created_at,
+        deleted_at: null,
+        full_name: p.name || "",
+        phone: p.phone || "",
+        bio: p.bio || "",
+        avatar_url: p.avatar_url || "",
+        applications: appsByUser.get(p.id) || [],
+      }));
+
+      return new Response(JSON.stringify({ users }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const users = (authUsersData || []).map((u: { id: string; email: string; created_at: string; deleted_at: string | null }) => {
       const profile = profilesMap.get(u.id);
       return {
         id: u.id,
         email: u.email || "",
         role: profile?.role || "user",
         created_at: u.created_at,
+        deleted_at: u.deleted_at || null,
         full_name: profile?.name || "",
         phone: profile?.phone || "",
         bio: profile?.bio || "",

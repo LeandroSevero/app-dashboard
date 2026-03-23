@@ -37,6 +37,7 @@ export interface AdminUser {
   email: string;
   role: "admin" | "user";
   created_at: string;
+  deleted_at?: string | null;
   full_name?: string;
   phone?: string;
   bio?: string;

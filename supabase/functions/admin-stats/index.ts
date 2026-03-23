@@ -43,12 +43,13 @@ Deno.serve(async (req: Request) => {
 
     if (callerProfile?.role !== "admin") return json({ error: "Acesso negado" }, 403);
 
-    const [profilesRes, allAppsRes, activeAppsRes, limitsRes, eventsRes] = await Promise.all([
+    const [profilesRes, allAppsRes, activeAppsRes, limitsRes, eventsRes, authUsersRes] = await Promise.all([
       supabase.from("profiles").select("id, role, created_at"),
       supabase.from("applications").select("id, type, created_at, user_id"),
       supabase.from("applications").select("id, type, created_at, user_id").is("deleted_at", null),
       supabase.from("user_limits").select("user_id, app_type, last_created_at, max_apps"),
       supabase.from("app_events").select("event_type, created_at").order("created_at", { ascending: false }).limit(200),
+      supabase.rpc("get_all_auth_users"),
     ]);
 
     const profiles = profilesRes.data || [];
@@ -56,6 +57,7 @@ Deno.serve(async (req: Request) => {
     const activeApps = activeAppsRes.data || [];
     const limits = limitsRes.data || [];
     const events = eventsRes.data || [];
+    const authUsers = authUsersRes.data || [];
 
     const capacityByType = limits.reduce((acc: Record<string, number>, l: { app_type: string; max_apps: number }) => {
       acc[l.app_type] = (acc[l.app_type] || 0) + (l.max_apps || 0);
@@ -95,8 +97,9 @@ Deno.serve(async (req: Request) => {
         const d = new Date(now - i * 86400000);
         days[d.toISOString().slice(0, 10)] = 0;
       }
-      for (const p of profiles) {
-        const day = (p.created_at as string).slice(0, 10);
+      const usersSource = authUsers.length > 0 ? authUsers : profiles;
+      for (const u of usersSource) {
+        const day = (u.created_at as string).slice(0, 10);
         if (day in days) days[day]++;
       }
       return Object.entries(days).map(([date, count]) => ({ date, count }));

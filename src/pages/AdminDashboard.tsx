@@ -545,9 +545,12 @@ interface UsersTabProps {
   onRoleFilterConsumed?: () => void;
 }
 
+type UserDeletedFilter = "all" | "active" | "deleted";
+
 function UsersTab({ users, loading, onRefresh, onUserUpdated, onUserDeleted, initialRoleFilter, onRoleFilterConsumed }: UsersTabProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState(initialRoleFilter ?? "");
+  const [deletedFilter, setDeletedFilter] = useState<UserDeletedFilter>("active");
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
@@ -562,7 +565,12 @@ function UsersTab({ users, loading, onRefresh, onUserUpdated, onUserDeleted, ini
     const matchSearch = u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (u.full_name || "").toLowerCase().includes(searchQuery.toLowerCase());
     const matchRole = roleFilter ? u.role === roleFilter : true;
-    return matchSearch && matchRole;
+    const isDeleted = !!u.deleted_at;
+    const matchDeleted =
+      deletedFilter === "all" ? true :
+      deletedFilter === "deleted" ? isDeleted :
+      !isDeleted;
+    return matchSearch && matchRole && matchDeleted;
   });
 
   async function handleDeleteUser(userId: string) {
@@ -589,14 +597,35 @@ function UsersTab({ users, loading, onRefresh, onUserUpdated, onUserDeleted, ini
         style={{ border: '1px solid var(--color-border)' }}
       >
         <div
-          className="flex items-center justify-between gap-3 px-6 py-4 flex-wrap"
+          className="px-6 py-4 space-y-3"
           style={{ background: 'var(--color-card)', borderBottom: '1px solid var(--color-border)' }}
         >
-          <div className="flex items-center gap-2">
-            <Users className="w-4 h-4" style={{ color: 'var(--color-fg-muted)' }} />
-            <h2 className="font-semibold text-sm" style={{ color: 'var(--color-fg)' }}>
-              Usuários ({filtered.length})
-            </h2>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4" style={{ color: 'var(--color-fg-muted)' }} />
+              <h2 className="font-semibold text-sm" style={{ color: 'var(--color-fg)' }}>
+                Usuários ({filtered.length})
+              </h2>
+            </div>
+            <div className="flex items-center gap-1 p-0.5 rounded-lg" style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}>
+              {([
+                { value: "active", label: "Somente ativos" },
+                { value: "all", label: "Ativos + excluídos" },
+                { value: "deleted", label: "Somente excluídos" },
+              ] as { value: UserDeletedFilter; label: string }[]).map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setDeletedFilter(opt.value)}
+                  className="px-2.5 py-1 rounded-md text-xs font-medium transition-all"
+                  style={deletedFilter === opt.value
+                    ? { background: opt.value === 'deleted' ? 'rgba(239,68,68,0.15)' : 'color-mix(in srgb, var(--color-primary) 15%, transparent)', color: opt.value === 'deleted' ? '#ef4444' : 'var(--color-primary)' }
+                    : { color: 'var(--color-fg-muted)', background: 'transparent' }
+                  }
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1.5">
@@ -625,14 +654,14 @@ function UsersTab({ users, loading, onRefresh, onUserUpdated, onUserDeleted, ini
                 }
               >Usuários</button>
             </div>
-            <div className="relative">
+            <div className="relative flex-1 min-w-40">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'var(--color-fg-muted)' }} />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Buscar usuário..."
-                className="pl-8 pr-3 py-1.5 rounded-lg text-sm focus:outline-none w-48"
+                className="pl-8 pr-3 py-1.5 rounded-lg text-sm focus:outline-none w-full"
                 style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', color: 'var(--color-fg)' }}
               />
             </div>
@@ -701,7 +730,7 @@ function UserProfileRow({ user, editing, onEditStart, onEditEnd, deleting, onDel
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-semibold" style={{ color: 'var(--color-fg)' }}>
+            <span className="text-sm font-semibold" style={{ color: user.deleted_at ? 'var(--color-fg-muted)' : 'var(--color-fg)' }}>
               {user.full_name || <span style={{ color: 'var(--color-fg-muted)', fontWeight: 400 }}>Sem nome</span>}
             </span>
             {user.role === "admin" && (
@@ -709,10 +738,18 @@ function UserProfileRow({ user, editing, onEditStart, onEditEnd, deleting, onDel
                 ADM
               </span>
             )}
+            {user.deleted_at && (
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-md" style={{ background: 'rgba(239,68,68,0.08)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}>
+                Excluído
+              </span>
+            )}
           </div>
           <p className="text-xs mt-0.5" style={{ color: 'var(--color-fg-muted)' }}>{user.email}</p>
           <p className="text-xs mt-0.5" style={{ color: 'var(--color-border2)' }}>
-            {user.applications.length} {user.applications.length === 1 ? "aplicação" : "aplicações"}
+            {user.deleted_at
+              ? `Excluído em ${new Date(user.deleted_at).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric' })}`
+              : `${user.applications.length} ${user.applications.length === 1 ? "aplicação" : "aplicações"}`
+            }
           </p>
         </div>
 
