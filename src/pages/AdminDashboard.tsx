@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Users,
   Server,
@@ -29,6 +29,7 @@ import {
   Clock,
   Filter,
   LayoutGrid,
+  ChevronDown,
 } from "lucide-react";
 import Header from "../components/Header";
 import Sidebar from "../components/Sidebar";
@@ -49,9 +50,15 @@ import {
   deleteApplication,
 } from "../lib/api";
 import type { AdminStats, AdminLog } from "../services/adminService";
-import type { AdminUser, Application } from "../types/database";
+import type { AdminUser, Application, Notification } from "../types/database";
 import { useAuth } from "../context/AuthContext";
 import { invokeWithAuth } from "../lib/supabase";
+import {
+  fetchNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+  triggerExpireApplications,
+} from "../services/notificationService";
 
 type AdminSection =
   | "admin-dashboard"
@@ -63,9 +70,10 @@ type AdminSection =
   | "admin-settings";
 
 export default function AdminDashboard() {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeSection, setActiveSection] = useState<AdminSection>("admin-dashboard");
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersFetched, setUsersFetched] = useState(false);
@@ -79,13 +87,17 @@ export default function AdminDashboard() {
 
   const [usersRoleFilter, setUsersRoleFilter] = useState<string>("");
   const [appsTypeFilter, setAppsTypeFilter] = useState<string>("");
+  const [appsAppFilter, setAppsAppFilter] = useState<string>("");
+  const [appsDeletedFilter, setAppsDeletedFilter] = useState<"all" | "active" | "deleted">("active");
   const [logsTypeFilter, setLogsTypeFilter] = useState<string>("");
 
   const sidebarWidth = sidebarCollapsed ? "ml-16" : "ml-60";
 
-  function navigateTo(section: AdminSection, filters?: { role?: string; appType?: string; logType?: string }) {
+  function navigateTo(section: AdminSection, filters?: { role?: string; appType?: string; logType?: string; appFilter?: string; deletedFilter?: "all" | "active" | "deleted" }) {
     if (filters?.role !== undefined) setUsersRoleFilter(filters.role);
     if (filters?.appType !== undefined) setAppsTypeFilter(filters.appType);
+    if (filters?.appFilter !== undefined) setAppsAppFilter(filters.appFilter);
+    if (filters?.deletedFilter !== undefined) setAppsDeletedFilter(filters.deletedFilter);
     if (filters?.logType !== undefined) setLogsTypeFilter(filters.logType);
     setActiveSection(section);
   }
@@ -105,6 +117,24 @@ export default function AdminDashboard() {
     setMyAppsLoading(false);
     setMyAppsFetched(true);
   }, []);
+
+  const loadNotifications = useCallback(async () => {
+    const result = await fetchNotifications();
+    if (result.success && result.data) setNotifications(result.data);
+  }, []);
+
+  useEffect(() => {
+    if (!session) return;
+    loadNotifications();
+
+    const runExpiration = async () => {
+      await triggerExpireApplications();
+      await loadNotifications();
+    };
+    runExpiration();
+    const interval = setInterval(runExpiration, 60000);
+    return () => clearInterval(interval);
+  }, [session, loadNotifications]);
 
   useEffect(() => {
     if ((activeSection === "admin-users" || activeSection === "admin-apps" || activeSection === "admin-resources" || activeSection === "admin-logs") && !usersFetched) {
@@ -137,13 +167,17 @@ export default function AdminDashboard() {
     );
   }
 
-  function handleAppDeleted(appId: string) {
+  async function handleAppDeleted(appId: string) {
     setUsers((prev) =>
       prev.map((u) => ({
         ...u,
-        applications: u.applications.filter((a) => a.id !== appId),
+        applications: u.applications.map((a) =>
+          a.id === appId ? { ...a, deleted_at: new Date().toISOString() } : a
+        ),
       }))
     );
+    await fetchUsers();
+    await loadNotifications();
   }
 
   async function handleMyAppCreate(name: string, type: string, ttlHours: number | null): Promise<{ error?: string; next_allowed_at?: string }> {
@@ -157,13 +191,19 @@ export default function AdminDashboard() {
   async function handleMyAppDelete(id: string) {
     setDeletingId(id);
     const result = await deleteApplication(id);
-    if (!result.error) setMyApps((prev) => prev.filter((a) => a.id !== id));
+    if (!result.error) {
+      setMyApps((prev) => prev.filter((a) => a.id !== id));
+    }
+    await fetchMyApps();
+    await loadNotifications();
     setDeletingId(null);
   }
 
-  const allApps: (Application & { userEmail: string; userId: string })[] = users.flatMap((u) =>
+  const allAppsWithDeleted: (Application & { userEmail: string; userId: string })[] = users.flatMap((u) =>
     u.applications.map((a) => ({ ...a, userEmail: u.email, userId: u.id }))
   );
+
+  const allApps: (Application & { userEmail: string; userId: string })[] = allAppsWithDeleted.filter((a) => !a.deleted_at);
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-bg)', color: 'var(--color-fg)' }}>
@@ -171,11 +211,32 @@ export default function AdminDashboard() {
         activeSection={activeSection}
         onSectionChange={(s) => setActiveSection(s as AdminSection)}
         collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         isAdmin
       />
       <Header
         onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
         sidebarCollapsed={sidebarCollapsed}
+        notifications={notifications}
+        onMarkNotificationRead={async (id) => {
+          await markNotificationRead(id);
+          setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+        }}
+        onMarkAllNotificationsRead={async () => {
+          await markAllNotificationsRead();
+          setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+        }}
+        onNotificationClick={(notif) => {
+          if (notif.meta?.event_type === "app_deleted") {
+            const appName = (notif.meta.app_name as string) ?? "";
+            if (!usersFetched) fetchUsers();
+            navigateTo("admin-apps", {
+              appFilter: appName,
+              deletedFilter: "deleted",
+              appType: "",
+            });
+          }
+        }}
       />
 
       <main className={`${sidebarWidth} pt-14 transition-all duration-300 min-h-screen`}>
@@ -213,13 +274,17 @@ export default function AdminDashboard() {
 
           {activeSection === "admin-apps" && (
             <ApplicationsTab
-              apps={allApps}
+              apps={allAppsWithDeleted}
               loading={usersLoading}
               onRefresh={fetchUsers}
               onAppUpdated={handleAppUpdated}
               onAppDeleted={handleAppDeleted}
               initialTypeFilter={appsTypeFilter}
               onTypeFilterConsumed={() => setAppsTypeFilter("")}
+              initialAppFilter={appsAppFilter}
+              onAppFilterConsumed={() => setAppsAppFilter("")}
+              initialDeletedFilter={appsDeletedFilter}
+              onDeletedFilterConsumed={() => setAppsDeletedFilter("active")}
             />
           )}
 
@@ -411,28 +476,61 @@ function TypeCard({ icon, label, count, color, bg, border, onClick }: { icon: Re
 
 function MiniChart({ title, data, color }: { title: string; data: Array<{ date: string; count: number }>; color: string }) {
   const max = Math.max(...data.map((d) => d.count), 1);
+  const mid = Math.round(max / 2);
+  const chartHeight = 56;
   return (
     <div className="rounded-2xl p-5" style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}>
       <div className="flex items-center gap-2 mb-4">
         <TrendingUp className="w-4 h-4" style={{ color }} />
         <p className="text-sm font-semibold" style={{ color: 'var(--color-fg)' }}>{title}</p>
       </div>
-      <div className="flex items-end gap-1.5 h-16">
-        {data.map((d) => {
-          const pct = (d.count / max) * 100;
-          const day = new Date(d.date + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short" });
-          return (
-            <div key={d.date} className="flex-1 flex flex-col items-center gap-1">
-              <div className="w-full flex items-end" style={{ height: 48 }}>
-                <div
-                  className="w-full rounded-t-sm transition-all duration-500"
-                  style={{ height: `${Math.max(pct, 4)}%`, background: color, opacity: 0.8 }}
-                />
-              </div>
-              <span className="text-xs" style={{ color: 'var(--color-fg-muted)', fontSize: '0.6rem' }}>{day}</span>
+      <div className="flex gap-1.5">
+        <div className="flex flex-col justify-between pb-5 pr-1" style={{ height: chartHeight + 20 }}>
+          <span className="text-right leading-none" style={{ color: 'var(--color-fg-muted)', fontSize: '0.6rem' }}>{max}</span>
+          <span className="text-right leading-none" style={{ color: 'var(--color-fg-muted)', fontSize: '0.6rem' }}>{mid}</span>
+          <span className="text-right leading-none" style={{ color: 'var(--color-fg-muted)', fontSize: '0.6rem' }}>0</span>
+        </div>
+        <div className="flex-1 flex flex-col">
+          <div className="flex items-end gap-1.5 relative" style={{ height: chartHeight }}>
+            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+              <div style={{ borderBottom: '1px dashed var(--color-border)', opacity: 0.5 }} />
+              <div style={{ borderBottom: '1px dashed var(--color-border)', opacity: 0.5 }} />
+              <div style={{ borderBottom: '1px solid var(--color-border)', opacity: 0.7 }} />
             </div>
-          );
-        })}
+            {data.map((d) => {
+              const pct = (d.count / max) * 100;
+              const day = new Date(d.date + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short" });
+              return (
+                <div key={d.date} className="relative flex-1 flex flex-col items-center gap-1 group">
+                  <div className="w-full flex items-end" style={{ height: chartHeight }}>
+                    <div
+                      className="w-full rounded-t-sm transition-all duration-500"
+                      style={{ height: `${Math.max(pct, 2)}%`, background: color, opacity: 0.85 }}
+                    />
+                  </div>
+                  {d.count > 0 && (
+                    <span
+                      className="absolute -top-4 left-1/2 -translate-x-1/2 text-center leading-none opacity-0 group-hover:opacity-100 transition-opacity"
+                      style={{ color, fontSize: '0.6rem', fontWeight: 700 }}
+                    >
+                      {d.count}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex gap-1.5 mt-1">
+            {data.map((d) => {
+              const day = new Date(d.date + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short" });
+              return (
+                <div key={d.date} className="flex-1 flex items-center justify-center">
+                  <span style={{ color: 'var(--color-fg-muted)', fontSize: '0.6rem' }}>{day}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
       <div className="mt-3 flex items-center justify-between">
         <p className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>Total</p>
@@ -932,15 +1030,32 @@ interface ApplicationsTabProps {
   onAppDeleted: (appId: string) => void;
   initialTypeFilter?: string;
   onTypeFilterConsumed?: () => void;
+  initialAppFilter?: string;
+  onAppFilterConsumed?: () => void;
+  initialDeletedFilter?: DeletedFilter;
+  onDeletedFilterConsumed?: () => void;
 }
 
 type DeletedFilter = "all" | "active" | "deleted";
 
-function ApplicationsTab({ apps, loading, onRefresh, onAppUpdated, onAppDeleted, initialTypeFilter, onTypeFilterConsumed }: ApplicationsTabProps) {
+function ApplicationsTab({ apps, loading, onRefresh, onAppUpdated, onAppDeleted, initialTypeFilter, onTypeFilterConsumed, initialAppFilter, onAppFilterConsumed, initialDeletedFilter, onDeletedFilterConsumed }: ApplicationsTabProps) {
   const [userFilter, setUserFilter] = useState("");
-  const [appFilter, setAppFilter] = useState("");
+  const [appFilter, setAppFilter] = useState(initialAppFilter ?? "");
   const [typeFilter, setTypeFilter] = useState(initialTypeFilter ?? "");
-  const [deletedFilter, setDeletedFilter] = useState<DeletedFilter>("active");
+  const [deletedFilter, setDeletedFilter] = useState<DeletedFilter>(initialDeletedFilter ?? "active");
+  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
+  const [hoveredTypeOpt, setHoveredTypeOpt] = useState<string | null>(null);
+  const typeDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (typeDropdownRef.current && !typeDropdownRef.current.contains(e.target as Node)) {
+        setTypeDropdownOpen(false);
+      }
+    }
+    if (typeDropdownOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [typeDropdownOpen]);
 
   useEffect(() => {
     if (initialTypeFilter !== undefined && initialTypeFilter !== typeFilter) {
@@ -948,6 +1063,20 @@ function ApplicationsTab({ apps, loading, onRefresh, onAppUpdated, onAppDeleted,
       onTypeFilterConsumed?.();
     }
   }, [initialTypeFilter]);
+
+  useEffect(() => {
+    if (initialAppFilter !== undefined && initialAppFilter !== "") {
+      setAppFilter(initialAppFilter);
+      onAppFilterConsumed?.();
+    }
+  }, [initialAppFilter]);
+
+  useEffect(() => {
+    if (initialDeletedFilter !== undefined && initialDeletedFilter !== deletedFilter) {
+      setDeletedFilter(initialDeletedFilter);
+      onDeletedFilterConsumed?.();
+    }
+  }, [initialDeletedFilter]);
 
   const filtered = apps.filter((a) => {
     const matchUser = a.userEmail.toLowerCase().includes(userFilter.toLowerCase());
@@ -982,8 +1111,8 @@ function ApplicationsTab({ apps, loading, onRefresh, onAppUpdated, onAppDeleted,
         </button>
       </div>
 
-      <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
-        <div className="px-6 py-4 space-y-3" style={{ background: 'var(--color-card)', borderBottom: '1px solid var(--color-border)' }}>
+      <div className="rounded-2xl" style={{ border: '1px solid var(--color-border)' }}>
+        <div className="px-6 py-4 space-y-3 rounded-t-2xl" style={{ background: 'var(--color-card)', borderBottom: '1px solid var(--color-border)' }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Boxes className="w-4 h-4" style={{ color: 'var(--color-fg-muted)' }} />
@@ -1015,12 +1144,42 @@ function ApplicationsTab({ apps, loading, onRefresh, onAppUpdated, onAppDeleted,
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'var(--color-fg-muted)' }} />
               <input type="text" value={userFilter} onChange={(e) => setUserFilter(e.target.value)} placeholder="Filtrar por usuário..." className="w-full pl-8 pr-3 py-1.5 rounded-lg text-sm focus:outline-none" style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', color: 'var(--color-fg)' }} />
             </div>
-            <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="px-3 py-1.5 rounded-lg text-sm focus:outline-none" style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', color: 'var(--color-fg)' }}>
-              <option value="">Todos os tipos</option>
-              <option value="rabbitmq">RabbitMQ</option>
-              <option value="lavinmq">LavinMQ</option>
-              <option value="mongodb">MongoDB</option>
-            </select>
+            <div className="relative" ref={typeDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setTypeDropdownOpen((v) => !v)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm min-w-[140px] justify-between"
+                style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', color: 'var(--color-fg)' }}
+              >
+                <span>{typeFilter === "" ? "Todos os tipos" : typeFilter === "rabbitmq" ? "RabbitMQ" : typeFilter === "lavinmq" ? "LavinMQ" : "MongoDB"}</span>
+                <ChevronDown className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--color-fg-muted)' }} />
+              </button>
+              {typeDropdownOpen && (
+                <div
+                  className="absolute z-50 mt-1 w-full rounded-xl overflow-hidden shadow-xl"
+                  style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}
+                >
+                  {[{ value: "", label: "Todos os tipos" }, { value: "rabbitmq", label: "RabbitMQ" }, { value: "lavinmq", label: "LavinMQ" }, { value: "mongodb", label: "MongoDB" }].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => { setTypeFilter(opt.value); setTypeDropdownOpen(false); }}
+                      onMouseEnter={() => setHoveredTypeOpt(opt.value)}
+                      onMouseLeave={() => setHoveredTypeOpt(null)}
+                      className="w-full text-left px-3 py-2 text-sm transition-colors"
+                      style={typeFilter === opt.value
+                        ? { background: hoveredTypeOpt === opt.value ? 'color-mix(in srgb, var(--color-primary) 20%, transparent)' : 'color-mix(in srgb, var(--color-primary) 12%, transparent)', color: 'var(--color-primary)' }
+                        : hoveredTypeOpt === opt.value
+                          ? { background: 'rgba(255,255,255,0.06)', color: 'var(--color-fg)' }
+                          : { color: 'var(--color-fg)', background: 'transparent' }
+                      }
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             {hasActiveFilters && (
               <button onClick={() => { setUserFilter(""); setAppFilter(""); setTypeFilter(""); setDeletedFilter("active"); }} className="px-3 py-1.5 rounded-lg text-xs" style={{ color: 'var(--color-fg-muted)', border: '1px solid var(--color-border)' }}>Limpar</button>
             )}
@@ -1077,25 +1236,25 @@ const APP_TYPE_CONFIG = {
 };
 
 const RABBITMQ_RES_LIMITS = {
-  connections: { max: 20, label: "Open Connections" },
-  queues: { max: 150, label: "Queues" },
-  messages: { max: 1_000_000, label: "Messages" },
-  queue_length: { max: 10_000, label: "Queue Length" },
-  idle_days: { max: 28, label: "Max Idle Queue Time", unit: "days" },
-  max_queue_size: { label: "Max queue size", value: "1 GB" },
+  connections: { max: 20, label: "Conexões abertas" },
+  queues: { max: 150, label: "Filas" },
+  messages: { max: 1_000_000, label: "Mensagens" },
+  queue_length: { max: 10_000, label: "Tamanho máx. da fila" },
+  idle_days: { max: 28, label: "Tempo máx. de inatividade", unit: "dias" },
+  max_queue_size: { label: "Tamanho máx. por fila", value: "1 GB" },
 };
 
 const LAVINMQ_RES_LIMITS = {
-  connections: { max: 40, label: "Open Connections" },
-  queues: { max: 300, label: "Queues" },
-  messages: { max: 2_000_000, label: "Messages" },
-  queue_length: { max: 20_000, label: "Queue Length" },
-  max_queue_size: { label: "Max queue size", value: "1 GB" },
+  connections: { max: 40, label: "Conexões abertas" },
+  queues: { max: 300, label: "Filas" },
+  messages: { max: 2_000_000, label: "Mensagens" },
+  queue_length: { max: 20_000, label: "Tamanho máx. da fila" },
+  max_queue_size: { label: "Tamanho máx. por fila", value: "1 GB" },
 };
 
 const MONGODB_RES_LIMITS = {
   storage: { max: 20, label: "Armazenamento", displayMax: "20.00 MB" },
-  collections: { max: 100, label: "Collections" },
+  collections: { max: 100, label: "Coleções" },
   connections: { max: 500, label: "Conexões simultâneas" },
 };
 
@@ -1576,8 +1735,12 @@ function AdminAppRow({ app, onUpdated, onDeleted, showDeletedAt }: AdminAppRowPr
   async function handleDelete() {
     setDeleting(true);
     const result = await adminDeleteApplication(app.id);
-    setDeleting(false);
-    if (!result.error) onDeleted();
+    if (!result.error) {
+      onDeleted();
+    } else {
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
   }
 
   async function handleRotatePassword() {
@@ -1672,12 +1835,14 @@ function AdminAppRow({ app, onUpdated, onDeleted, showDeletedAt }: AdminAppRowPr
 
           {confirmDelete ? (
             <div className="flex items-center gap-1">
-              <button onClick={() => { handleDelete(); setConfirmDelete(false); }} disabled={deleting} className="p-1.5 rounded-lg disabled:opacity-50" style={{ color: '#ef4444' }}>
+              <button onClick={handleDelete} disabled={deleting} className="p-1.5 rounded-lg disabled:opacity-50" style={{ color: '#ef4444' }} title={deleting ? "Excluindo..." : "Confirmar exclusão"}>
                 {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
               </button>
-              <button onClick={() => setConfirmDelete(false)} style={{ color: 'var(--color-fg-muted)' }} className="p-1.5 rounded-lg">
-                <X className="w-3.5 h-3.5" />
-              </button>
+              {!deleting && (
+                <button onClick={() => setConfirmDelete(false)} style={{ color: 'var(--color-fg-muted)' }} className="p-1.5 rounded-lg">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           ) : (
             <button onClick={() => setConfirmDelete(true)} className="p-1.5 rounded-lg transition-all" style={{ color: 'var(--color-fg-muted)' }} title="Deletar">
@@ -1710,8 +1875,8 @@ function AdminAppRow({ app, onUpdated, onDeleted, showDeletedAt }: AdminAppRowPr
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--color-fg-muted)' }}>Conexão</p>
               <div className="space-y-2">
-                <CredRow label="Connection String" value={app.connection_url || ""} secret />
-                <CredRow label="Database" value={app.mongo_db || ""} />
+                <CredRow label="String de conexão" value={app.connection_url || ""} secret />
+                <CredRow label="Banco" value={app.mongo_db || ""} />
                 <CredRow label="Usuário" value={app.mongo_user || ""} />
                 <CredRow label="Senha" value={app.mongo_password || ""} secret />
               </div>

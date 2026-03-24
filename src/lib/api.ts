@@ -12,6 +12,11 @@ export async function listApplications(): Promise<{ applications: Application[];
   return { applications: res.data ?? [], error: res.error };
 }
 
+export async function listInactiveApplications(): Promise<{ applications: Application[]; error?: string }> {
+  const res = await appSvc.fetchInactiveApplications();
+  return { applications: res.data ?? [], error: res.error };
+}
+
 export async function createApplication(
   name: string,
   type: string,

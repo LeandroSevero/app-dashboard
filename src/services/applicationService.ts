@@ -49,6 +49,51 @@ export async function fetchApplications(): Promise<ApiResponse<Application[]>> {
   }
 }
 
+export async function fetchInactiveApplications(): Promise<ApiResponse<Application[]>> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return { success: false, error: "Sessão não encontrada. Faça login novamente." };
+
+    const now = new Date().toISOString();
+
+    const { data: deleted, error: e1 } = await supabase
+      .from("applications")
+      .select("*")
+      .not("deleted_at", "is", null)
+      .eq("user_id", session.user.id)
+      .order("deleted_at", { ascending: false });
+
+    if (e1) return { success: false, error: e1.message };
+
+    const { data: expired, error: e2 } = await supabase
+      .from("applications")
+      .select("*")
+      .is("deleted_at", null)
+      .not("expires_at", "is", null)
+      .lte("expires_at", now)
+      .eq("user_id", session.user.id)
+      .order("expires_at", { ascending: false });
+
+    if (e2) return { success: false, error: e2.message };
+
+    const combined = [
+      ...(deleted || []).map(mapRow),
+      ...(expired || []).map(mapRow),
+    ];
+
+    const seen = new Set<string>();
+    const unique = combined.filter((a) => {
+      if (seen.has(a.id)) return false;
+      seen.add(a.id);
+      return true;
+    });
+
+    return { success: true, data: unique };
+  } catch {
+    return { success: false, error: "Erro de conexão" };
+  }
+}
+
 export async function createApplication(
   name: string,
   type: string,

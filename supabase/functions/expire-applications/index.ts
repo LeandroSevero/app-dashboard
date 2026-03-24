@@ -91,8 +91,8 @@ async function dropMongoDatabase(dbName: string): Promise<void> {
   }
 }
 
-async function deleteCloudamqpInstance(cloudamqpId: string) {
-  if (!CLOUDAMQP_API_KEY) return null;
+async function deleteCloudamqpInstance(cloudamqpId: string): Promise<void> {
+  if (!CLOUDAMQP_API_KEY) return;
   const credentials = btoa(`${CLOUDAMQP_API_KEY}:`);
   const res = await fetch(`${CLOUDAMQP_API_URL}/instances/${cloudamqpId}`, {
     method: "DELETE",
@@ -102,7 +102,6 @@ async function deleteCloudamqpInstance(cloudamqpId: string) {
     const text = await res.text();
     throw new Error(`CloudAMQP ${res.status}: ${text}`);
   }
-  return null;
 }
 
 Deno.serve(async (req: Request) => {
@@ -111,133 +110,82 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Não autorizado" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const userClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const now = new Date().toISOString();
 
-    const { data: { user }, error: authError } = await userClient.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Não autorizado" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    const isAdmin = profile?.role === "admin";
-
-    const { id: appId } = await req.json();
-    if (!appId) {
-      return new Response(JSON.stringify({ error: "ID da aplicação é obrigatório" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    let query = supabase
+    const { data: expiredApps, error: fetchError } = await supabase
       .from("applications")
-      .select("id, name, type, cloudamqp_id, mongo_user, mongo_db, user_id")
-      .eq("id", appId)
-      .is("deleted_at", null);
-    if (!isAdmin) query = query.eq("user_id", user.id);
+      .select("id, type, cloudamqp_id, mongo_user, mongo_db, user_id, name")
+      .is("deleted_at", null)
+      .not("expires_at", "is", null)
+      .lte("expires_at", now);
 
-    const { data: app, error: fetchError } = await query.maybeSingle();
-    if (fetchError || !app) {
-      return new Response(JSON.stringify({ error: "Aplicação não encontrada" }), {
-        status: 404,
+    if (fetchError) {
+      return new Response(JSON.stringify({ error: fetchError.message }), {
+        status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    if (!expiredApps || expiredApps.length === 0) {
+      return new Response(JSON.stringify({ processed: 0 }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const appIds = expiredApps.map((a: { id: string }) => a.id);
 
     await supabase
       .from("applications")
-      .update({ deleted_at: new Date().toISOString() })
-      .eq("id", appId);
+      .update({ deleted_at: now })
+      .in("id", appIds);
 
-    await supabase.from("app_events").insert({
+    const typeLabel = (type: string) =>
+      type === "lavinmq" ? "LavinMQ" : type === "mongodb" ? "MongoDB" : "RabbitMQ";
+
+    const notifications = expiredApps.map((app: { user_id: string; name: string; type: string; id: string }) => ({
       user_id: app.user_id,
-      application_id: appId,
+      title: "Aplicação expirada e removida",
+      message: `Sua aplicação "${app.name}" (${typeLabel(app.type)}) atingiu o tempo limite e foi deletada automaticamente.`,
+      type: "app_expired",
+      read: false,
+      meta: { app_id: app.id, app_name: app.name, app_type: app.type },
+    }));
+
+    await supabase.from("notifications").insert(notifications);
+
+    const appEvents = expiredApps.map((app: { user_id: string; id: string; name: string; type: string }) => ({
+      user_id: app.user_id,
+      application_id: app.id,
       event_type: "delete",
-      meta: { name: app.name, type: app.type },
-    });
+      meta: { name: app.name, type: app.type, reason: "ttl_expired" },
+    }));
 
-    const { data: ownerProfile } = await supabase
-      .from("profiles")
-      .select("email")
-      .eq("id", app.user_id)
-      .maybeSingle();
-    const ownerEmail = ownerProfile?.email ?? "";
-
-    const notifMeta = {
-      event_type: "app_deleted",
-      app_id: appId,
-      app_name: app.name,
-      app_type: app.type,
-      owner_email: ownerEmail,
-    };
-
-    await supabase.from("notifications").insert({
-      user_id: app.user_id,
-      title: "Recurso excluído",
-      message: `Seu recurso "${app.name}" (${app.type}) foi excluído.`,
-      type: "warning",
-      meta: notifMeta,
-    });
-
-    const { data: adminProfiles } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("role", "admin")
-      .neq("id", app.user_id);
-
-    if (adminProfiles && adminProfiles.length > 0) {
-      const deletedBy = isAdmin && user.id !== app.user_id
-        ? `pelo administrador (${user.email ?? ""})`
-        : `pelo próprio usuário`;
-
-      await supabase.from("notifications").insert(
-        adminProfiles.map((p: { id: string }) => ({
-          user_id: p.id,
-          title: "Recurso excluído",
-          message: `O recurso "${app.name}" (${app.type}) do usuário ${ownerEmail} foi excluído ${deletedBy}.`,
-          type: "warning",
-          meta: notifMeta,
-        }))
-      );
-    }
+    await supabase.from("app_events").insert(appEvents);
 
     const cleanup = async () => {
-      if (app.type === "mongodb") {
-        if (app.mongo_user) await deleteAtlasDatabaseUser(app.mongo_user);
-        if (app.mongo_db) await dropMongoDatabase(app.mongo_db);
-      } else if (app.cloudamqp_id) {
-        await deleteCloudamqpInstance(app.cloudamqp_id);
+      for (const app of expiredApps as { type: string; mongo_user?: string; mongo_db?: string; cloudamqp_id?: string }[]) {
+        try {
+          if (app.type === "mongodb") {
+            if (app.mongo_user) await deleteAtlasDatabaseUser(app.mongo_user);
+            if (app.mongo_db) await dropMongoDatabase(app.mongo_db);
+          } else if (app.cloudamqp_id) {
+            await deleteCloudamqpInstance(app.cloudamqp_id);
+          }
+        } catch (_err) {
+          // best-effort cleanup
+        }
       }
     };
 
     EdgeRuntime.waitUntil(cleanup());
 
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({ processed: expiredApps.length }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

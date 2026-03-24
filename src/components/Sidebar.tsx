@@ -7,6 +7,7 @@ import {
   Globe,
   BarChart3,
   ChevronRight,
+  ChevronLeft,
   Users,
   User,
   Database,
@@ -27,6 +28,7 @@ interface SidebarProps {
   activeSection: string;
   onSectionChange: (section: string) => void;
   collapsed: boolean;
+  onToggleCollapse: () => void;
   isAdmin?: boolean;
   profileCompletion?: number;
 }
@@ -54,7 +56,7 @@ const adminOnlyItems: NavItem[] = [
   { icon: <Settings className="w-4 h-4" />, label: "Configurações", section: "admin-settings", available: false, adminOnly: true },
 ];
 
-export default function Sidebar({ activeSection, onSectionChange, collapsed, isAdmin, profileCompletion }: SidebarProps) {
+export default function Sidebar({ activeSection, onSectionChange, collapsed, onToggleCollapse, isAdmin, profileCompletion }: SidebarProps) {
   const showProfileWarning = !isAdmin && profileCompletion !== undefined && profileCompletion < 100;
   const navItems = isAdmin ? adminNavItems : userNavItems;
 
@@ -64,26 +66,29 @@ export default function Sidebar({ activeSection, onSectionChange, collapsed, isA
       style={{ background: 'var(--color-sidebar-bg)', borderRight: '1px solid var(--color-sidebar-border)' }}
     >
       <div
-        className={`flex items-center gap-3 px-4 py-5 ${collapsed ? "justify-center" : ""}`}
+        className={`flex items-center gap-3 px-4 py-4 ${collapsed ? "justify-center" : ""}`}
         style={{ borderBottom: '1px solid var(--color-border)' }}
       >
-        <div
-          className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center"
-          style={{
-            background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)',
-            border: '1px solid color-mix(in srgb, var(--color-primary) 25%, transparent)',
-          }}
+        <button
+          onClick={() => onSectionChange(isAdmin ? "admin-dashboard" : "dashboard")}
+          className="flex items-center focus:outline-none"
+          title="Dashboard"
         >
-          <Server className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
-        </div>
-        {!collapsed && (
-          <div className="overflow-hidden">
-            <p className="font-semibold text-sm leading-tight" style={{ color: 'var(--color-fg)' }}>Leandro Severo</p>
-            <p className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>
-              {isAdmin ? "Administrador" : "Painel"}
-            </p>
-          </div>
-        )}
+          {collapsed ? (
+            <img
+              src="/Green_and_Black_Minimal_Code_Search_Logo_(1).svg"
+              alt="Logo"
+              className="w-8 h-8 object-contain flex-shrink-0"
+            />
+          ) : (
+            <img
+              src="/Green_and_Black_Minimal_Code_Search_Logo_(1).svg"
+              alt="Logo"
+              className="h-8 object-contain flex-shrink-0"
+              style={{ maxWidth: '140px' }}
+            />
+          )}
+        </button>
       </div>
 
       <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
@@ -140,11 +145,22 @@ export default function Sidebar({ activeSection, onSectionChange, collapsed, isA
         )}
       </nav>
 
-      {!collapsed && (
-        <div className="px-4 py-4" style={{ borderTop: '1px solid var(--color-border)' }}>
+      <div
+        className={`px-2 py-3 flex ${collapsed ? "justify-center" : "justify-between items-center px-4"}`}
+        style={{ borderTop: '1px solid var(--color-border)' }}
+      >
+        {!collapsed && (
           <p className="text-xs" style={{ color: 'var(--color-border2)' }}>v1.0.0 · DevOps Panel</p>
-        </div>
-      )}
+        )}
+        <button
+          onClick={onToggleCollapse}
+          className="p-2 rounded-lg transition-all"
+          style={{ color: 'var(--color-fg-muted)' }}
+          title={collapsed ? "Expandir menu" : "Recolher menu"}
+        >
+          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </button>
+      </div>
     </aside>
   );
 }

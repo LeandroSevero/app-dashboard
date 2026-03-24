@@ -11,6 +11,7 @@ import {
   BarChart3,
   Timer,
   AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import type { Application } from "../types/database";
 
@@ -144,7 +145,7 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
             <p className="text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--color-fg-muted)' }}>Conexão</p>
             <div className="space-y-2 flex-1">
               <PasswordRow
-                label="Connection"
+                label="Conexão"
                 value={app.connection_url || ""}
                 field="connection_url"
                 show={showPassword}
@@ -152,9 +153,9 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
                 copiedField={copiedField}
                 onCopy={copyToClipboard}
               />
-              <CredentialRow label="Database" value={app.mongo_db || ""} field="mongo_db" copiedField={copiedField} onCopy={copyToClipboard} />
+              <CredentialRow label="Banco" value={app.mongo_db || ""} field="mongo_db" copiedField={copiedField} onCopy={copyToClipboard} />
               {app.mongo_collection && (
-                <CredentialRow label="Collection" value={app.mongo_collection} field="mongo_collection" copiedField={copiedField} onCopy={copyToClipboard} />
+                <CredentialRow label="Coleção" value={app.mongo_collection} field="mongo_collection" copiedField={copiedField} onCopy={copyToClipboard} />
               )}
               <CredentialRow label="Usuário" value={app.mongo_user || ""} field="mongo_user" copiedField={copiedField} onCopy={copyToClipboard} />
               <PasswordRow
@@ -209,7 +210,7 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
 
             {showMqtt && (
               <div className="mt-2 space-y-2">
-                <CredentialRow label="URL" value={app.amqp_url} field="url" copiedField={copiedField} onCopy={copyToClipboard} />
+                <CredentialRow label="URL AMQP" value={app.amqp_url} field="url" copiedField={copiedField} onCopy={copyToClipboard} />
                 <CredentialRow label="Usuário" value={app.username} field="username" copiedField={copiedField} onCopy={copyToClipboard} />
                 <PasswordRow
                   label="Senha"
@@ -255,16 +256,19 @@ export default function ApplicationCard({ app, onDelete, deleting, onViewDetails
             <button
               onClick={() => onDelete(app.id)}
               disabled={deleting}
-              className="btn-glass-danger text-xs font-medium px-2.5 py-1 rounded-lg disabled:opacity-50"
+              className="btn-glass-danger text-xs font-medium px-2.5 py-1 rounded-lg disabled:opacity-50 flex items-center gap-1"
             >
-              {deleting ? "..." : "Sim"}
+              {deleting && <Loader2 className="w-3 h-3 animate-spin" />}
+              {deleting ? "Excluindo..." : "Sim"}
             </button>
-            <button
-              onClick={() => setConfirmDelete(false)}
-              className="btn-glass text-xs font-medium px-2.5 py-1 rounded-lg"
-            >
-              Não
-            </button>
+            {!deleting && (
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="btn-glass text-xs font-medium px-2.5 py-1 rounded-lg"
+              >
+                Não
+              </button>
+            )}
           </div>
         ) : (
           <button

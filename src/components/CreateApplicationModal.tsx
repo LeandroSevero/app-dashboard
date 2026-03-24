@@ -20,6 +20,12 @@ const TTL_OPTIONS = [
   { value: 24, label: "24 horas" },
 ];
 
+const VALID_NAME_REGEX = /^[a-zA-Z0-9\-_]*$/;
+
+function hasSpecialChars(value: string): boolean {
+  return !VALID_NAME_REGEX.test(value);
+}
+
 export default function CreateApplicationModal({ onClose, onCreate }: CreateApplicationModalProps) {
   const [name, setName] = useState("");
   const [type, setType] = useState<AppType>("rabbitmq");
@@ -32,10 +38,11 @@ export default function CreateApplicationModal({ onClose, onCreate }: CreateAppl
   });
 
   const currentLimit = limits[type];
+  const nameHasInvalidChars = name.length > 0 && hasSpecialChars(name);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim() || currentLimit.blocked) return;
+    if (!name.trim() || currentLimit.blocked || nameHasInvalidChars) return;
     setLoading(true);
 
     const result = await onCreate(name.trim(), type, ttlHours);
@@ -120,10 +127,22 @@ export default function CreateApplicationModal({ onClose, onCreate }: CreateAppl
               className="w-full rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-all"
               style={{
                 background: "var(--color-bg-secondary)",
-                border: "1px solid var(--color-border)",
+                border: nameHasInvalidChars
+                  ? "1px solid rgba(239,68,68,0.7)"
+                  : "1px solid var(--color-border)",
                 color: "var(--color-fg)",
               }}
             />
+            {nameHasInvalidChars && (
+              <p className="mt-1.5 text-xs flex items-center gap-1.5" style={{ color: "#ef4444" }}>
+                <span>Apenas letras, números, hífens e underlines são permitidos.</span>
+              </p>
+            )}
+            {!nameHasInvalidChars && (
+              <p className="mt-1.5 text-xs" style={{ color: "var(--color-fg-muted)" }}>
+                Permitido: letras, números, <code className="font-mono">-</code> e <code className="font-mono">_</code>
+              </p>
+            )}
           </div>
 
           <div>
@@ -234,7 +253,7 @@ export default function CreateApplicationModal({ onClose, onCreate }: CreateAppl
             </button>
             <button
               type="submit"
-              disabled={loading || !name.trim() || currentLimit.blocked}
+              disabled={loading || !name.trim() || currentLimit.blocked || nameHasInvalidChars}
               className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ background: "var(--color-primary)", color: "var(--color-primary-fg)" }}
             >
