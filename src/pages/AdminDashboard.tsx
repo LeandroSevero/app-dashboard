@@ -192,9 +192,10 @@ export default function AdminDashboard() {
     setDeletingId(id);
     const result = await deleteApplication(id);
     if (!result.error) {
-      await fetchMyApps();
-      await loadNotifications();
+      setMyApps((prev) => prev.filter((a) => a.id !== id));
     }
+    await fetchMyApps();
+    await loadNotifications();
     setDeletingId(null);
   }
 
