@@ -173,10 +173,14 @@ export default function Dashboard() {
         notifications={notifications}
         onMarkNotificationRead={handleMarkNotificationRead}
         onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
-        onNotificationClick={(notif) => {
+        onNotificationClick={async (notif) => {
           const appName = (notif.meta?.app_name as string) ?? "";
           setAppsInitialFilter(appName);
           setAppsFilterVersion((v) => v + 1);
+          if (notif.type === "app_expired") {
+            setShowInactive(true);
+            await fetchInactiveApplications();
+          }
           setActiveSection("applications");
         }}
       />
@@ -353,6 +357,10 @@ function ApplicationsSection({
     ? applications.filter((a) => a.name.toLowerCase().includes(appFilter.toLowerCase()))
     : applications;
 
+  const filteredInactive = appFilter
+    ? inactiveApplications.filter((a) => a.name.toLowerCase().includes(appFilter.toLowerCase()))
+    : inactiveApplications;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -451,14 +459,18 @@ function ApplicationsSection({
 
         {showInactive && !loadingInactive && (
           <div className="mt-4">
-            {inactiveApplications.length === 0 ? (
+            {filteredInactive.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-center">
                 <History className="w-7 h-7 mb-3" style={{ color: "var(--color-fg-muted)" }} />
-                <p className="text-sm" style={{ color: "var(--color-fg-muted)" }}>Nenhuma aplicação deletada ou expirada.</p>
+                <p className="text-sm" style={{ color: "var(--color-fg-muted)" }}>
+                  {appFilter
+                    ? `Nenhuma aplicação deletada ou expirada encontrada para "${appFilter}".`
+                    : "Nenhuma aplicação deletada ou expirada."}
+                </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {inactiveApplications.map((app) => (
+                {filteredInactive.map((app) => (
                   <InactiveApplicationCard key={app.id} app={app} />
                 ))}
               </div>
