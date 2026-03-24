@@ -9,6 +9,9 @@ import {
   User,
   AlertCircle,
   Search,
+  History,
+  Trash2,
+  Clock,
 } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Header from "../components/Header";
@@ -17,7 +20,7 @@ import CreateApplicationModal from "../components/CreateApplicationModal";
 import ApplicationDetailModal from "../components/ApplicationDetailModal";
 import UserProfile, { calcCompletion } from "../components/UserProfile";
 import ProfileIncompletePopup from "../components/ProfileIncompletePopup";
-import { listApplications, createApplication, deleteApplication } from "../lib/api";
+import { listApplications, listInactiveApplications, createApplication, deleteApplication } from "../lib/api";
 import {
   fetchNotifications,
   markNotificationRead,
@@ -40,6 +43,11 @@ export default function Dashboard() {
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [appsInitialFilter, setAppsInitialFilter] = useState("");
+  const [appsFilterVersion, setAppsFilterVersion] = useState(0);
+
+  const [inactiveApplications, setInactiveApplications] = useState<Application[]>([]);
+  const [loadingInactive, setLoadingInactive] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
 
   const [profileCompletion, setProfileCompletion] = useState(100);
   const [showProfilePopup, setShowProfilePopup] = useState(false);
@@ -60,6 +68,20 @@ export default function Dashboard() {
     if (error) setAppsError(error);
     setLoadingApps(false);
   }, []);
+
+  const fetchInactiveApplications = useCallback(async () => {
+    setLoadingInactive(true);
+    const { applications } = await listInactiveApplications();
+    setInactiveApplications(applications);
+    setLoadingInactive(false);
+  }, []);
+
+  async function handleToggleInactive(show: boolean) {
+    setShowInactive(show);
+    if (show) {
+      await fetchInactiveApplications();
+    }
+  }
 
   useEffect(() => {
     if (!session) return;
@@ -154,6 +176,7 @@ export default function Dashboard() {
         onNotificationClick={(notif) => {
           const appName = (notif.meta?.app_name as string) ?? "";
           setAppsInitialFilter(appName);
+          setAppsFilterVersion((v) => v + 1);
           setActiveSection("applications");
         }}
       />
@@ -172,6 +195,11 @@ export default function Dashboard() {
               onOpenCreate={() => setShowCreateModal(true)}
               onViewDetails={setDetailApp}
               initialAppFilter={appsInitialFilter}
+              filterVersion={appsFilterVersion}
+              inactiveApplications={inactiveApplications}
+              loadingInactive={loadingInactive}
+              showInactive={showInactive}
+              onToggleInactive={handleToggleInactive}
             />
           )}
           {activeSection === "profile" && (
@@ -290,6 +318,11 @@ interface ApplicationsSectionProps {
   onOpenCreate: () => void;
   onViewDetails: (app: Application) => void;
   initialAppFilter?: string;
+  filterVersion?: number;
+  inactiveApplications: Application[];
+  loadingInactive: boolean;
+  showInactive: boolean;
+  onToggleInactive: (show: boolean) => void;
 }
 
 function ApplicationsSection({
@@ -302,14 +335,19 @@ function ApplicationsSection({
   onOpenCreate,
   onViewDetails,
   initialAppFilter,
+  filterVersion,
+  inactiveApplications,
+  loadingInactive,
+  showInactive,
+  onToggleInactive,
 }: ApplicationsSectionProps) {
   const [appFilter, setAppFilter] = useState(initialAppFilter ?? "");
 
   useEffect(() => {
-    if (initialAppFilter !== undefined && initialAppFilter !== "") {
+    if (initialAppFilter !== undefined) {
       setAppFilter(initialAppFilter);
     }
-  }, [initialAppFilter]);
+  }, [initialAppFilter, filterVersion]);
 
   const filtered = appFilter
     ? applications.filter((a) => a.name.toLowerCase().includes(appFilter.toLowerCase()))
@@ -395,6 +433,96 @@ function ApplicationsSection({
           ))}
         </div>
       )}
+
+      <div>
+        <button
+          onClick={() => onToggleInactive(!showInactive)}
+          className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl transition-all"
+          style={{
+            background: showInactive ? "color-mix(in srgb, var(--color-primary) 10%, transparent)" : "var(--color-bg-secondary)",
+            border: `1px solid ${showInactive ? "color-mix(in srgb, var(--color-primary) 30%, transparent)" : "var(--color-border)"}`,
+            color: showInactive ? "var(--color-primary)" : "var(--color-fg-muted)",
+          }}
+        >
+          <History className="w-4 h-4" />
+          {showInactive ? "Ocultar histórico" : "Ver deletadas e expiradas"}
+          {loadingInactive && <RefreshCw className="w-3.5 h-3.5 animate-spin ml-1" />}
+        </button>
+
+        {showInactive && !loadingInactive && (
+          <div className="mt-4">
+            {inactiveApplications.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <History className="w-7 h-7 mb-3" style={{ color: "var(--color-fg-muted)" }} />
+                <p className="text-sm" style={{ color: "var(--color-fg-muted)" }}>Nenhuma aplicação deletada ou expirada.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {inactiveApplications.map((app) => (
+                  <InactiveApplicationCard key={app.id} app={app} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function InactiveApplicationCard({ app }: { app: Application }) {
+  const typeLabel = app.type === "lavinmq" ? "LavinMQ" : app.type === "mongodb" ? "MongoDB" : "RabbitMQ";
+  const typeBadgeStyle = app.type === "lavinmq"
+    ? { color: '#06b6d4', background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.2)' }
+    : app.type === "mongodb"
+    ? { color: '#22c55e', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)' }
+    : { color: '#f97316', background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.2)' };
+
+  const isDeleted = !!app.deleted_at;
+  const statusDate = isDeleted ? app.deleted_at! : app.expires_at!;
+  const statusLabel = isDeleted ? "Deletada em" : "Expirou em";
+
+  const formattedDate = new Date(statusDate).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  return (
+    <div
+      className="rounded-2xl flex items-center gap-4 px-5 py-4 opacity-60"
+      style={{ background: "var(--color-card)", border: "1px solid var(--color-border)" }}
+    >
+      <div
+        className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+        style={{ background: "var(--color-bg-secondary)", border: "1px solid var(--color-border)" }}
+      >
+        {app.type === "lavinmq" ? (
+          <img src="/LavinMQ.svg" alt="LavinMQ" className="w-5 h-5 grayscale" />
+        ) : app.type === "mongodb" ? (
+          <img src="/mongodb.svg" alt="MongoDB" className="w-5 h-5 grayscale" />
+        ) : (
+          <img src="/RabbitMQ.svg" alt="RabbitMQ" className="w-5 h-5 grayscale" />
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold truncate" style={{ color: "var(--color-fg)" }}>{app.name}</p>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          {isDeleted ? (
+            <Trash2 className="w-3 h-3 flex-shrink-0" style={{ color: "#ef4444" }} />
+          ) : (
+            <Clock className="w-3 h-3 flex-shrink-0" style={{ color: "#f59e0b" }} />
+          )}
+          <p className="text-xs truncate" style={{ color: "var(--color-fg-muted)" }}>
+            {statusLabel} {formattedDate}
+          </p>
+        </div>
+      </div>
+      <span className="text-xs font-medium px-2.5 py-1 rounded-lg flex-shrink-0" style={typeBadgeStyle}>
+        {typeLabel}
+      </span>
     </div>
   );
 }
